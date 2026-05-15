@@ -1,0 +1,9 @@
+.DS_Store
+*.test
+*.out
+coverage.*
+.idea/
+.vscode/
+
+# Cached vendor simulator binaries
+testdata/cache/
