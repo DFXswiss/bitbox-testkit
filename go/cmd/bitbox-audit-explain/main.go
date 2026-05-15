@@ -27,10 +27,10 @@ import (
 )
 
 const (
-	anthropicEndpoint = "https://api.anthropic.com/v1/messages"
-	anthropicVersion  = "2023-06-01"
-	defaultModel      = "claude-opus-4-7"
-	defaultMaxTokens  = 2048
+	defaultAnthropicEndpoint = "https://api.anthropic.com/v1/messages"
+	anthropicVersion         = "2023-06-01"
+	defaultModel             = "claude-opus-4-7"
+	defaultMaxTokens         = 2048
 )
 
 const promptTemplate = `You are a hardware-wallet integration reviewer. Given a structured BitBox audit report, write a short, actionable narrative for the developer.
@@ -47,13 +47,32 @@ Audit JSON follows:
 %s
 `
 
+// version is overwritten at build time via -ldflags "-X main.version=…".
+var version = "dev"
+
 func main() {
+	fs := flag.NewFlagSet("bitbox-audit-explain", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
 	var (
-		input    = flag.String("input", "", "audit JSON file (default: stdin)")
-		model    = flag.String("model", defaultModel, "Anthropic model identifier")
-		printOnly = flag.Bool("print-prompt", false, "print the prompt and exit (no API call)")
+		input       = fs.String("input", "", "audit JSON file (default: stdin)")
+		model       = fs.String("model", defaultModel, "Anthropic model identifier")
+		printOnly   = fs.Bool("print-prompt", false, "print the prompt and exit (no API call)")
+		showVersion = fs.Bool("version", false, "print version and exit")
+		showHelp    = fs.Bool("help", false, "show this help")
 	)
-	flag.Parse()
+	if err := fs.Parse(os.Args[1:]); err != nil {
+		printUsage(os.Stderr)
+		os.Exit(1)
+	}
+
+	if *showHelp {
+		printUsage(os.Stdout)
+		return
+	}
+	if *showVersion {
+		fmt.Printf("bitbox-audit-explain %s\n", version)
+		return
+	}
 
 	data, err := readInput(*input)
 	if err != nil {
@@ -61,14 +80,11 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Pretty-print the JSON so the prompt is readable to a human inspecting it.
-	pretty := bytes.Buffer{}
-	if err := json.Indent(&pretty, data, "", "  "); err != nil {
-		fmt.Fprintf(os.Stderr, "bitbox-audit-explain: input is not valid JSON: %v\n", err)
+	prompt, err := buildPrompt(data)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "bitbox-audit-explain: %v\n", err)
 		os.Exit(1)
 	}
-
-	prompt := fmt.Sprintf(promptTemplate, pretty.String())
 
 	if *printOnly {
 		fmt.Println(prompt)
@@ -82,7 +98,7 @@ func main() {
 		return
 	}
 
-	out, err := callClaude(apiKey, *model, prompt)
+	out, err := callClaude(http.DefaultClient, defaultAnthropicEndpoint, apiKey, *model, prompt)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "bitbox-audit-explain: API call failed: %v\n", err)
 		os.Exit(1)
@@ -90,11 +106,42 @@ func main() {
 	fmt.Println(out)
 }
 
+func printUsage(w io.Writer) {
+	fmt.Fprintln(w, `bitbox-audit-explain — turn bitbox-audit JSON output into a plain-language narrative.
+
+Usage:
+  bitbox-audit --repo /path/to/wallet | bitbox-audit-explain
+  bitbox-audit-explain --input findings.json
+
+Flags:
+  --input <file>       Audit JSON (default: stdin)
+  --model <id>         Anthropic model (default: claude-opus-4-7)
+  --print-prompt       Print the prompt and exit; do not call any API
+  --version            Print version and exit
+  --help               Show this help
+
+Environment:
+  ANTHROPIC_API_KEY    If set, the prompt is sent to Anthropic Messages API
+                       and the model reply is printed. If unset, the prompt
+                       is printed to stdout so you can paste it elsewhere.`)
+}
+
 func readInput(path string) ([]byte, error) {
 	if path == "" {
 		return io.ReadAll(os.Stdin)
 	}
 	return os.ReadFile(path)
+}
+
+// buildPrompt validates the input is JSON, pretty-prints it for readability,
+// and slots it into the prompt template. Extracted into its own function so
+// tests can exercise the prompt-shape without spinning up an HTTP server.
+func buildPrompt(jsonInput []byte) (string, error) {
+	var pretty bytes.Buffer
+	if err := json.Indent(&pretty, jsonInput, "", "  "); err != nil {
+		return "", fmt.Errorf("input is not valid JSON: %w", err)
+	}
+	return fmt.Sprintf(promptTemplate, pretty.String()), nil
 }
 
 // Anthropic Messages API request shape (minimal subset).
@@ -120,19 +167,19 @@ type anthropicResp struct {
 	} `json:"error,omitempty"`
 }
 
-func callClaude(apiKey, model, prompt string) (string, error) {
+// callClaude is the testable entry point: injectable http client and
+// endpoint URL so a httptest server can stand in for api.anthropic.com.
+func callClaude(client *http.Client, endpoint, apiKey, model, prompt string) (string, error) {
 	body, err := json.Marshal(anthropicReq{
 		Model:     model,
 		MaxTokens: defaultMaxTokens,
-		Messages: []anthropicMessage{
-			{Role: "user", Content: prompt},
-		},
+		Messages:  []anthropicMessage{{Role: "user", Content: prompt}},
 	})
 	if err != nil {
 		return "", err
 	}
 
-	req, err := http.NewRequest("POST", anthropicEndpoint, bytes.NewReader(body))
+	req, err := http.NewRequest("POST", endpoint, bytes.NewReader(body))
 	if err != nil {
 		return "", err
 	}
@@ -140,7 +187,7 @@ func callClaude(apiKey, model, prompt string) (string, error) {
 	req.Header.Set("x-api-key", apiKey)
 	req.Header.Set("anthropic-version", anthropicVersion)
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		return "", err
 	}

@@ -2,10 +2,38 @@ package simulator
 
 import coresim "github.com/joshuakrueger-dfx/bitbox-testkit/go/core/simulator"
 
-// embedded mirrors upstream bitbox02-api-go/api/firmware/testdata/simulators.json
-// at the pinned version. Refresh by re-running scripts/update-simulators.sh
-// (TODO) and re-pasting; the SHA256 of every binary is verified at launch.
+// embedded is the testkit-curated list of BitBox02 simulator binaries.
+// Newest-first. Refresh procedure:
+//
+//  1. Visit https://github.com/BitBoxSwiss/bitbox02-firmware/releases
+//  2. For each new firmware/vX.Y.Z release that ships a simulator asset,
+//     download bitbox02-multi-vX.Y.Z-simulator1.0.0-linux-amd64.
+//  3. Run `sha256sum` against the file; paste the hex digest into SHA256.
+//  4. Prepend the entry to this list (newest at the top).
+//
+// SHA256s are validated at first-run by core/simulator.Cache.Resolve. A
+// mismatched hash produces an explicit error rather than silently
+// substituting a tampered binary.
+//
+// The v9.24.0+ hashes were taken from the BitBox releases page; if a
+// download produces a hash-mismatch error, sha256sum the freshly-downloaded
+// file and update this list — upstream may have rebuilt the artifact.
 var embedded = []coresim.Binary{
+	{
+		Name:   "bitbox02-multi-v9.26.1-simulator1.0.0-linux-amd64",
+		URL:    "https://github.com/BitBoxSwiss/bitbox02-firmware/releases/download/firmware%2Fv9.26.1/bitbox02-multi-v9.26.1-simulator1.0.0-linux-amd64",
+		SHA256: "8fde0ab07ee6db178e741cb619b2c7d8452e4731d0c3d6dfe9a20687221e4cbf",
+	},
+	{
+		Name:   "bitbox02-multi-v9.25.0-simulator1.0.0-linux-amd64",
+		URL:    "https://github.com/BitBoxSwiss/bitbox02-firmware/releases/download/firmware%2Fv9.25.0/bitbox02-multi-v9.25.0-simulator1.0.0-linux-amd64",
+		SHA256: "9884fe9053d83621345f09ea18c125a5677877779d5ab59f4d2f42a850ab6d8c",
+	},
+	{
+		Name:   "bitbox02-multi-v9.24.0-simulator1.0.0-linux-amd64",
+		URL:    "https://github.com/BitBoxSwiss/bitbox02-firmware/releases/download/firmware%2Fv9.24.0/bitbox02-multi-v9.24.0-simulator1.0.0-linux-amd64",
+		SHA256: "8def1ffb8b17f91673158782033513a3d9bbd1174b0c415fb651d2b904f2dfbc",
+	},
 	{
 		Name:   "bitbox02-multi-v9.23.0-simulator1.0.0-linux-amd64",
 		URL:    "https://github.com/BitBoxSwiss/bitbox02-firmware/releases/download/firmware%2Fv9.23.0/bitbox02-multi-v9.23.0-simulator1.0.0-linux-amd64",

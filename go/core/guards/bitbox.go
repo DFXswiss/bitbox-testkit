@@ -1,88 +1,102 @@
-// audit-skip-file: this file documents the patterns the audit-runner looks
-// for. Without this marker it would self-flag.
+// audit-skip-file: this file documents the BitBox guards consumed by
+// test suites. Without this marker it would self-flag its own pattern
+// references.
+
 package guards
 
 import (
-	"bytes"
-	"regexp"
+	"io/fs"
+	"os"
+	"path/filepath"
 	"strings"
+
+	"github.com/joshuakrueger-dfx/bitbox-testkit/go/bitbox/quirks"
 )
 
-// Pre-built guards for known BitBox plugin regressions. Call these from a
-// consumer's _test.go with the source directory to scan.
-
-// MustHaveRecoverPanicOnExports asserts every gomobile-exported function in
-// the given directory has a `defer recoverPanic(` or similar guard. The
-// regex matches function declarations whose names start with an uppercase
-// letter (Go convention for exported) and verifies the next ~5 lines
-// reference recoverPanic.
+// RunQuirk applies every detect rule of the named quirk to source files
+// under `root` matching `include` (a single glob like "*.go"). Each
+// finding becomes a t.Errorf so the failure is attributable to the call
+// site.
 //
-// This is a heuristic: false positives are possible for non-export-bound
-// helpers. The rule is "every exported function the plugin surfaces to
-// Flutter must defer recoverPanic"; see the regex literal for the exact
-// match expected.
-var recoverPanicRequired = regexp.MustCompile(`(?m)^func\s+[A-Z][A-Za-z0-9_]*\s*\([^)]*\)[^{]*\{(?:\s*//[^\n]*)?\s*(?:[^d]|d[^e]|de[^f])`)
+// Returns the number of findings emitted; usually you discard the value
+// and rely on the test framework's failure tracking.
+func RunQuirk(t TB, root, include, quirkID string) int {
+	t.Helper()
+	q := quirks.FindByID(quirkID)
+	if q.ID == "" {
+		t.Errorf("guards: no quirk with ID %q in registry", quirkID)
+		return 0
+	}
+	return runPatterns(t, root, include, q)
+}
 
-// BLE-dedup ordering: contains() must be checked before removeAll() runs.
-// The bug class: removeAll fires first and the subsequent contains is
-// never true, silently dropping legitimate retransmits.
-var (
-	seenPacketsContains  = regexp.MustCompile(`seenPackets\.contains\s*\(`)
-	seenPacketsRemoveAll = regexp.MustCompile(`seenPackets\.removeAll\s*\(`)
-)
-
-// BitBoxDedupOrder fails if any source file under root contains
-// `seenPackets.removeAll(` before `seenPackets.contains(`. Run from the
-// plugin's u2fhid package directory.
+// BitBoxDedupOrder fails if any source file under root reverses the
+// `seenPackets.contains/has/includes` → `seenPackets.clear/removeAll/delete`
+// ordering. Thin wrapper around quirk P2.
 func BitBoxDedupOrder(t TB, root, include string) {
 	t.Helper()
-	MustOrderPaired(t, root, include,
-		seenPacketsContains, seenPacketsRemoveAll,
-		"contains() must be evaluated before removeAll() in BLE packet de-dup; reversing the order silently drops legitimate retransmits")
+	RunQuirk(t, root, include, "P2")
 }
 
-// hardcoded10sTimeout matches the legacy `time.Sleep(10 * time.Second)` or
-// `time.After(10 * time.Second)` pattern in transport code. The fix was to
-// remove the hard-coded 10s and use context deadlines.
-var hardcoded10sTimeout = regexp.MustCompile(`time\.(Sleep|After)\(\s*10\s*\*\s*time\.Second\s*\)`)
-
-// NoHardcoded10sTransportTimeout fails if any file contains
-// `time.Sleep(10 * time.Second)` or `time.After(10 * time.Second)`. Run
-// from transport-layer source directories.
+// NoHardcoded10sTransportTimeout fails if any source file contains a
+// hard-coded 10-second timeout pattern in a BitBox transport context.
+// Thin wrapper around quirk A2.
 func NoHardcoded10sTransportTimeout(t TB, root, include string) {
 	t.Helper()
-	MustNotMatch(t, root, include, hardcoded10sTimeout,
-		"hard-coded 10s timeouts in transport code blocked user-confirm flows; use context deadlines")
+	RunQuirk(t, root, include, "A2")
 }
 
-// nonAsciiInStringLiteral matches a quoted string that contains a non-ASCII
-// byte (≥ 0x80). Used in tandem with a file-level EIP-712 context filter.
-var nonAsciiInStringLiteral = regexp.MustCompile(`["'][^"']*[\x80-\xff][^"']*["']`)
-
-// NoNonAsciiInEIP712Literals fails if any file under root that mentions
-// EIP-712 / signTyped also contains a string literal with non-ASCII bytes.
-// The bug class: BitBox firmware rejects non-ASCII in EIP-712 string
-// values (ErrInvalidInput 101), so the plugin must transliterate to ASCII
-// before sending. The two-pass scan keeps noise low: unrelated files with
-// umlauts are ignored.
+// NoNonAsciiInEIP712Literals fails if any file in an EIP-712 context
+// contains string literals with non-ASCII bytes. Thin wrapper around quirk E1.
 func NoNonAsciiInEIP712Literals(t TB, root, include string) {
 	t.Helper()
-	err := walkFiles(root, include, func(path string, content []byte) {
-		lower := bytes.ToLower(content)
-		if !bytes.Contains(lower, []byte("eip712")) && !bytes.Contains(lower, []byte("signtyped")) {
-			return
+	RunQuirk(t, root, include, "E1")
+}
+
+// runPatterns walks `root`, opens every matching file, applies the quirk's
+// detect rules, and reports findings.
+func runPatterns(t TB, root, include string, q quirks.Quirk) int {
+	t.Helper()
+	if len(q.Patterns) == 0 {
+		return 0
+	}
+
+	count := 0
+	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
 		}
-		loc := nonAsciiInStringLiteral.FindIndex(content)
-		if loc == nil {
-			return
+		if d.IsDir() {
+			name := d.Name()
+			if name == "vendor" || name == "node_modules" || name == "dist" || name == "build" {
+				return fs.SkipDir
+			}
+			if strings.HasPrefix(name, ".") && name != "." {
+				return fs.SkipDir
+			}
+			return nil
 		}
-		line := 1 + strings.Count(string(content[:loc[0]]), "\n")
-		t.Errorf("guards: %s:%d contains a non-ASCII string literal in an EIP-712/signTyped context; transliterate via toBitboxSafeAscii before signing",
-			path, line)
+		if ok, _ := filepath.Match(include, filepath.Base(path)); !ok {
+			return nil
+		}
+		content, err := os.ReadFile(path)
+		if err != nil {
+			return nil
+		}
+		rel := path
+		if strings.HasPrefix(path, root+string(filepath.Separator)) {
+			rel = path[len(root)+1:]
+		}
+		findings := quirks.ScanFile(rel, content, []quirks.Quirk{q})
+		for _, f := range findings {
+			count++
+			t.Errorf("guards/%s: %s:%d  %s\n  reason: %s\n  fix:    %s",
+				f.QuirkID, f.File, f.Line, f.Snippet, f.Reason, f.FixHint)
+		}
+		return nil
 	})
 	if err != nil {
 		t.Errorf("guards: walk %s: %v", root, err)
 	}
+	return count
 }
-
-var _ = recoverPanicRequired // reserved for a follow-up MustHaveRecoverPanicOnExports impl

@@ -85,7 +85,10 @@ func f() {
 
 func TestNoHardcoded10sTimeout(t *testing.T) {
 	dir := t.TempDir()
+	// File mentions BitBox so the A2 context filter matches; otherwise
+	// the guard correctly suppresses unrelated 10s timeouts.
 	write(t, dir, "bad.go", `package x
+// BitBox transport
 import "time"
 func f() { time.Sleep(10 * time.Second) }
 `)
@@ -93,6 +96,21 @@ func f() { time.Sleep(10 * time.Second) }
 	guards.NoHardcoded10sTransportTimeout(f, dir, "*.go")
 	if len(f.errs) == 0 {
 		t.Fatal("expected 10s-timeout guard to fire")
+	}
+}
+
+func TestA2GuardIgnoresUnrelatedTimeouts(t *testing.T) {
+	// 10s timeouts outside a BitBox context should NOT fire (this was a
+	// drift bug before the guard switched to data-driven patterns).
+	dir := t.TempDir()
+	write(t, dir, "animation.go", `package ui
+import "time"
+func fadeOut() { time.Sleep(10 * time.Second) }
+`)
+	f := &fakeTB{}
+	guards.NoHardcoded10sTransportTimeout(f, dir, "*.go")
+	if len(f.errs) != 0 {
+		t.Fatalf("unrelated context should not fire A2 guard, got: %v", f.errs)
 	}
 }
 

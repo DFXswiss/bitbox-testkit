@@ -4,7 +4,12 @@
  * callbacks.ts.
  */
 
-import rawJson from './quirks.json' with { type: 'json' };
+// tsconfig has resolveJsonModule: true, so a bare JSON import works
+// in all toolchains (ts-jest, tsc-emitted ESM, bundlers). The newer
+// `with { type: 'json' }` assert is available in Node 20.10+, but
+// older toolchains (notably ts-jest under Jest 29 without ESM flags)
+// trip over it. Plain import keeps the package broadly usable.
+import rawJson from './quirks.json';
 import type { Quirk, Category, Severity, FirmwareRange, Filter, DetectRule } from './types.js';
 import { attachCallbacks } from './callbacks.js';
 

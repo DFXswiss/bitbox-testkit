@@ -5,14 +5,15 @@
 //   - the firmware version range it applies to
 //   - a Severity hint (Critical / Warning / Hint)
 //   - a Source reference (proto file, CHANGELOG entry, observed bug)
-//   - optional Detect: a source-level static check ([[guards]] style)
+//   - Patterns: data-driven static-detection rules (see DetectRule)
 //   - optional Scenario: a *fake.Fake configured to simulate the firmware
 //     reaction for runtime tests
 //   - optional Match: maps a Go test failure message back to this quirk so
 //     audit reports can name the bug class
 //
-// Quirks live in category files (eth.go, btc.go, ...) and register themselves
-// via init(). The audit runner iterates Registry to produce reports.
+// The audit runner and the core/guards test helpers both iterate Patterns
+// via quirks.ScanFile, keeping detection logic drift-free between the two
+// surfaces.
 package quirks
 
 import (
@@ -20,7 +21,6 @@ import (
 	"strings"
 
 	"github.com/joshuakrueger-dfx/bitbox-testkit/go/bitbox/fake"
-	"github.com/joshuakrueger-dfx/bitbox-testkit/go/core/guards"
 )
 
 // Category groups quirks by area of impact.
@@ -142,11 +142,6 @@ type Quirk struct {
 
 	// Firmware bounds the firmware versions the quirk applies to.
 	Firmware FirmwareRange
-
-	// Detect runs a static source check at test-time (using a Go testing.TB).
-	// Independent of Patterns: Detect is the rich/code-driven path used by
-	// dedicated test suites; Patterns drive the data-driven audit-runner.
-	Detect func(t guards.TB, srcDir, include string)
 
 	// Scenario returns a configured *fake.Fake the consumer plugs into
 	// firmware.NewDevice.

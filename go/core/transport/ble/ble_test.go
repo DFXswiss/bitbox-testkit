@@ -130,3 +130,63 @@ func TestWaitForWriteDeadline(t *testing.T) {
 		t.Fatal("incorrectly reported 100 bytes available")
 	}
 }
+
+// TestStressInjectReadInterleaving runs Inject and Read in tight
+// goroutines and verifies no bytes are dropped or duplicated. Locks in
+// the correctness of the channel-cap-1 signaling: even with thousands
+// of interleaved operations, every injected byte makes it to Read.
+func TestStressInjectReadInterleaving(t *testing.T) {
+	const N = 5000
+	p := ble.New()
+	defer p.Close()
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for i := 0; i < N; i++ {
+			_ = p.Inject([]byte{byte(i & 0xff)})
+		}
+	}()
+
+	got := make([]byte, 0, N)
+	buf := make([]byte, 64)
+	for len(got) < N {
+		n, err := p.Read(buf)
+		if err != nil {
+			t.Fatalf("read after %d bytes: %v", len(got), err)
+		}
+		got = append(got, buf[:n]...)
+	}
+	wg.Wait()
+
+	if len(got) != N {
+		t.Fatalf("got %d bytes, want %d", len(got), N)
+	}
+	for i, b := range got {
+		if b != byte(i&0xff) {
+			t.Fatalf("byte %d: got %02x, want %02x", i, b, byte(i&0xff))
+		}
+	}
+}
+
+// TestStressCloseRaceUnblocksRead verifies Close consistently unblocks
+// pending Reads even under tight interleaving.
+func TestStressCloseRaceUnblocksRead(t *testing.T) {
+	for trial := 0; trial < 50; trial++ {
+		p := ble.New()
+		done := make(chan struct{})
+		go func() {
+			buf := make([]byte, 4)
+			_, _ = p.Read(buf)
+			close(done)
+		}()
+		time.Sleep(time.Microsecond * time.Duration(trial))
+		_ = p.Close()
+		select {
+		case <-done:
+		case <-time.After(time.Second):
+			t.Fatalf("trial %d: Read did not unblock after Close", trial)
+		}
+	}
+}

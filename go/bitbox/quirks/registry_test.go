@@ -65,8 +65,8 @@ func TestRegistryFieldsPresent(t *testing.T) {
 		if q.Source == "" {
 			t.Errorf("quirk %s missing Source", q.ID)
 		}
-		if q.Detect == nil && q.Scenario == nil {
-			t.Errorf("quirk %s has neither Detect nor Scenario — useless entry", q.ID)
+		if len(q.Patterns) == 0 && q.Scenario == nil {
+			t.Errorf("quirk %s has neither Patterns nor Scenario — useless entry", q.ID)
 		}
 	}
 }

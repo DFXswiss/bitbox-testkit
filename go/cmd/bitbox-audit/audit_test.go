@@ -115,6 +115,21 @@ setTimeout(cb, 10000);
 	}
 }
 
+func TestScanFlagsA2DartFutureDelayed(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "bitbox_ble.dart", `// BitBox BLE transport for Flutter
+import 'dart:async';
+Future<void> waitConfirm() async {
+  await Future.delayed(Duration(seconds: 10));
+}
+`)
+	files, _ := enumerateSources(dir)
+	got := scan(dir, files, []quirks.Quirk{quirkByID(t, "A2")})
+	if len(got) == 0 {
+		t.Fatal("expected A2 finding for Dart Future.delayed(Duration(seconds: 10))")
+	}
+}
+
 func TestScanA2IgnoresUnrelatedTimeouts(t *testing.T) {
 	// 10s timeouts in non-transport contexts (animation, debounce) should
 	// not trigger the audit. This is the false-positive guard.
