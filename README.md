@@ -60,6 +60,25 @@ jest.mock('bitbox-api', () => {
 
 See [`TESTING.md`](TESTING.md) for the full cookbook and per-layer guidance.
 
+## Audit any BitBox-integrating repo
+
+The `bitbox-audit` CLI scans a repository for known regressions and emits a structured report. Pipe the JSON into `bitbox-audit-explain` for a plain-language narrative (uses Claude if `ANTHROPIC_API_KEY` is set, otherwise prints the ready-to-paste prompt).
+
+```bash
+go install github.com/joshuakrueger-dfx/bitbox-testkit/go/cmd/bitbox-audit@latest
+go install github.com/joshuakrueger-dfx/bitbox-testkit/go/cmd/bitbox-audit-explain@latest
+
+bitbox-audit --repo /path/to/your/wallet > findings.json
+bitbox-audit-explain --input findings.json   # narrative report
+```
+
+The audit detects:
+- non-ASCII string literals in EIP-712 contexts (quirk E1)
+- BLE packet-dedup ordering reversals (quirk P2)
+- hard-coded 10-second transport timeouts (quirk A2)
+
+Other quirks have no static signature and surface only through dedicated tests using the language-specific Scenario factories.
+
 ## Layout
 
 ```
