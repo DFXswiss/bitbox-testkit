@@ -1,0 +1,29 @@
+{
+  "name": "@joshuakrueger-dfx/bitbox-testkit",
+  "version": "0.1.0",
+  "description": "Test infrastructure for BitBox02 integrations: scriptable fakes, scenario library, source-level regression guards. TypeScript port targeting bitbox-api (Rust/WASM).",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js",
+    "./fake": "./dist/fake/index.js",
+    "./quirks": "./dist/quirks/index.js",
+    "./scenarios": "./dist/scenarios/index.js",
+    "./guards": "./dist/guards/index.js"
+  },
+  "files": ["dist", "src"],
+  "scripts": {
+    "build": "tsc",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.12",
+    "@types/node": "^20.14.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.2",
+    "typescript": "^5.4.5"
+  }
+}

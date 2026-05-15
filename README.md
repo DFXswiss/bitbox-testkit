@@ -1,29 +1,81 @@
 # bitbox-testkit
 
-Test infrastructure for BitBox02 Flutter plugins: scriptable API fakes, a BLE-transport fake, official Linux simulator integration, and source-level regression guards.
+Test infrastructure for BitBox02 integrations. Two implementations share one knowledge base:
+
+| Stack | Lives at | Targets |
+| ----- | -------- | ------- |
+| **Go** | `/go/` | `bitbox02-api-go` (Flutter plugins, native Go consumers) |
+| **TypeScript** | `/ts/` | `bitbox-api` Rust/WASM (React Native, web, Node) |
+
+Both load the same firmware-constraint database (`/go/bitbox/quirks/quirks.json`) and attach language-specific Scenario / Detect callbacks by quirk ID. A CI check (`scripts/sync-quirks.sh --check`) prevents drift between the Go-side canonical and the TS-side copy.
+
+## What it provides
+
+- **Scriptable fakes** — drop-in replacement for `bitbox02-api-go`'s `firmware.Communication` (Go) or `bitbox-api`'s `PairedBitBox` (TS).
+- **Pre-built scenarios** — Umlaut-rejection, BLE-dedup retransmit, gomobile/WebView panic, slow user-confirm, etc.
+- **Quirks registry** — 30 documented BitBox firmware constraints with severity, source citation and firmware version range.
+- **Source-level guards** — regex-based static checks for known bad patterns (BLE-dedup ordering, hard-coded 10s timeouts, non-ASCII in EIP-712 string literals).
+- **Vendor simulator integration** (Go only, Linux/amd64) — downloads and runs the official BitBox02 simulator binary.
+
+## Quick start
+
+### Go
+
+```bash
+go get github.com/joshuakrueger-dfx/bitbox-testkit/go
+```
+
+```go
+import (
+    "github.com/BitBoxSwiss/bitbox02-api-go/api/firmware"
+    "github.com/BitBoxSwiss/bitbox02-api-go/api/firmware/mocks"
+    "github.com/joshuakrueger-dfx/bitbox-testkit/go/bitbox/scenarios"
+)
+
+fake := scenarios.RegressionUmlautEIP712()
+dev := firmware.NewDevice(nil, nil, &mocks.Config{}, fake, &mocks.Logger{})
+// drive dev, assert your client transliterates EIP-712 payloads
+```
+
+### TypeScript
+
+```bash
+npm install --save-dev @joshuakrueger-dfx/bitbox-testkit
+```
+
+```ts
+import { buildPairedBitBox } from '@joshuakrueger-dfx/bitbox-testkit/fake';
+import { scenarioRegressionUmlautEIP712 } from '@joshuakrueger-dfx/bitbox-testkit/scenarios';
+
+jest.mock('bitbox-api', () => {
+  return {
+    bitbox02ConnectAuto: async () => ({
+      unlockAndPair: async () => ({
+        waitConfirm: async () => buildPairedBitBox(scenarioRegressionUmlautEIP712()),
+      }),
+    }),
+  };
+});
+```
+
+See [`TESTING.md`](TESTING.md) for the full cookbook and per-layer guidance.
 
 ## Layout
 
 ```
-core/
-  simulator/    vendor simulator binary lifecycle (download, launch, teardown)
-  scenario/     generic scriptable scenario framework
-  transport/    fake transports (BLE peripheral, U2FHID framing helpers)
-  guards/       source-level regression checks
-  testutil/     deadlock detection, timeouts, t.Helper wrappers
-
-bitbox/
-  fake/         in-memory firmware.Communication implementation
-  simulator/    convenience wrapper around core/simulator for the BitBox02 sim
-  scenarios/    library of pre-built scenarios (Umlaut-reject, BLE-dedup, ...)
+/quirks/SCHEMA.md           # canonical schema for the knowledge base
+/go/bitbox/quirks/          # Go module + embedded quirks.json
+/ts/src/                    # TypeScript source
+/scripts/sync-quirks.sh     # keep ts/src/quirks/quirks.json byte-identical to the Go side
+.github/workflows/test.yml  # CI: Go vet/race + TS unit + sync check
 ```
 
-## Test layers
+## Adding a new quirk
 
-| Layer                                | Catches                                     | Cost     |
-| ------------------------------------ | ------------------------------------------- | -------- |
-| `bitbox/fake` (API)                  | App-logic bugs, error paths, gomobile panics| fast     |
-| `core/transport/ble` (transport)     | BLE framing, dedup, stale buffer            | fast     |
-| `bitbox/simulator` (end-to-end)      | Firmware-level behavior                     | Linux CI |
+1. Add an entry to `/go/bitbox/quirks/quirks.json`.
+2. Run `./scripts/sync-quirks.sh` to refresh the TS copy.
+3. Add the Go callback in `/go/bitbox/quirks/callbacks.go` (case branch on the new ID).
+4. Add the TS callback in `/ts/src/quirks/callbacks.ts`.
+5. Add tests in both languages.
 
-See [TESTING.md](TESTING.md).
+The quirks JSON is the single source of truth; both languages just attach callbacks by ID.

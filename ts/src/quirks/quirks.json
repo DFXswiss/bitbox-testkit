@@ -1,0 +1,277 @@
+{
+  "schema_version": "1.0",
+  "description": "Language-neutral knowledge base of BitBox02 firmware constraints. Consumed by /go/bitbox/quirks and /ts/src/quirks alike. See SCHEMA.md for field semantics.",
+  "quirks": [
+    {
+      "id": "E1",
+      "name": "non-ascii-eip712-string",
+      "category": "eth",
+      "severity": "critical",
+      "description": "Firmware rejects EIP-712 string values containing non-ASCII bytes (umlauts, emojis) with ErrInvalidInput 101. Client must transliterate (e.g. NFKD + ASCII fallback) before signTypedData.",
+      "source": "Observed in production; ErrInvalidInput=101 in api/firmware/error.go",
+      "firmware": {"min": "", "max": ""},
+      "match_regex": "(?i)\\binvalid[- ]?input\\b|\\b101\\b"
+    },
+    {
+      "id": "E2",
+      "name": "eth-nonce-max-16-bytes",
+      "category": "eth",
+      "severity": "warning",
+      "description": "nonce field of ETHSignRequest/EIP1559Request is capped at 16 bytes (smallest big-endian encoding). Leading zero-bytes or values > 2^128 are rejected.",
+      "source": "messages/eth.proto: nonce documented as max 16 bytes",
+      "firmware": {"min": "", "max": ""}
+    },
+    {
+      "id": "E3",
+      "name": "eth-recipient-must-be-20-bytes",
+      "category": "eth",
+      "severity": "critical",
+      "description": "recipient field of ETHSignRequest must be exactly 20 bytes. Anything else (EIP-55 strings, 0x-prefixed hex, ENS resolved late) is rejected with ErrInvalidInput.",
+      "source": "messages/eth.proto: recipient = 20 bytes",
+      "firmware": {"min": "", "max": ""}
+    },
+    {
+      "id": "E4",
+      "name": "eth-value-max-32-bytes",
+      "category": "eth",
+      "severity": "warning",
+      "description": "value field is capped at 32 bytes (smallest big-endian). Values > 2^256 are firmware-rejected.",
+      "source": "messages/eth.proto: value max 32 bytes",
+      "firmware": {"min": "", "max": ""}
+    },
+    {
+      "id": "E5",
+      "name": "eth-eip1559-fee-fields-max-16-bytes",
+      "category": "eth",
+      "severity": "warning",
+      "description": "max_priority_fee_per_gas and max_fee_per_gas are each capped at 16 bytes (smallest big-endian).",
+      "source": "messages/eth.proto: ETHSignEIP1559Request fee fields",
+      "firmware": {"min": "", "max": ""}
+    },
+    {
+      "id": "E6",
+      "name": "eth-numerics-must-be-minimal-bigendian",
+      "category": "eth",
+      "severity": "warning",
+      "description": "All ETH numeric fields require 'smallest big-endian serialization'. Leading zero bytes (incl. left-pad to 32) cause ErrInvalidInput. Strip leading zeros before sending.",
+      "source": "messages/eth.proto: documented for all numeric fields",
+      "firmware": {"min": "", "max": ""}
+    },
+    {
+      "id": "E7",
+      "name": "eth-address-case-enum-bounded",
+      "category": "eth",
+      "severity": "hint",
+      "description": "address_case enum accepts 0 (MIXED), 1 (UPPER), 2 (LOWER) only. Other values rejected.",
+      "source": "messages/eth.proto: ETHAddressCase enum",
+      "firmware": {"min": "", "max": ""}
+    },
+    {
+      "id": "E8",
+      "name": "eth-data-length-must-match-streamed-data",
+      "category": "eth",
+      "severity": "critical",
+      "description": "When using streamed data signing, data_length must exactly match the byte count actually streamed. Mismatch results in firmware abort mid-stream.",
+      "source": "messages/eth.proto: data_length / ETHSignRequest streaming",
+      "firmware": {"min": "", "max": ""}
+    },
+    {
+      "id": "E9",
+      "name": "eth-empty-data-zero-value-requires-v9.15.0+",
+      "category": "eth",
+      "severity": "warning",
+      "description": "Firmware < v9.15.0 rejects ETH transactions with empty data AND zero value (no-op transfers). v9.15.0 allows them.",
+      "source": "CHANGELOG v9.15.0: 'Allow ETH transactions with empty data + zero value'",
+      "firmware": {"min": "", "max": "9.15.0"}
+    },
+    {
+      "id": "E10",
+      "name": "eth-known-network-list-versioned",
+      "category": "eth",
+      "severity": "hint",
+      "description": "Firmware ships an allowlist of well-known chain IDs. New chains (HYPE, SONIC added v9.23.1) are unknown on older firmware and need explicit user-confirmation flows or 'unknown network' UX.",
+      "source": "CHANGELOG v9.23.1: 'Added HyperEVM (HYPE) and SONIC (S)'",
+      "firmware": {"min": "", "max": "9.23.1"}
+    },
+    {
+      "id": "B1",
+      "name": "btc-locktime-below-500m",
+      "category": "btc",
+      "severity": "warning",
+      "description": "BTCSignInitRequest.locktime must be < 500_000_000. Timestamp-style locktimes are firmware-rejected.",
+      "source": "messages/btc.proto: locktime constraint",
+      "firmware": {"min": "", "max": ""}
+    },
+    {
+      "id": "B2",
+      "name": "btc-version-must-be-1-or-2",
+      "category": "btc",
+      "severity": "critical",
+      "description": "BTCSignInitRequest.version must be 1 or 2. Other transaction versions are rejected.",
+      "source": "messages/btc.proto: version field",
+      "firmware": {"min": "", "max": ""}
+    },
+    {
+      "id": "B3",
+      "name": "btc-sequence-restricted-values",
+      "category": "btc",
+      "severity": "warning",
+      "description": "BTCSignInputRequest.sequence must be 0xffffffff, 0xffffffff-1 (RBF), or 0xffffffff-2. Pre-v9.16.0 emitted warning for other values.",
+      "source": "messages/btc.proto: sequence + CHANGELOG v9.16.0",
+      "firmware": {"min": "", "max": ""}
+    },
+    {
+      "id": "B4",
+      "name": "btc-payload-size-matches-address-type",
+      "category": "btc",
+      "severity": "critical",
+      "description": "BTCSignOutputRequest.payload must be 20 bytes for p2pkh/p2sh/p2wpkh and 32 bytes for p2wsh. Mismatch triggers firmware reject.",
+      "source": "messages/btc.proto: BTCSignOutputRequest payload",
+      "firmware": {"min": "", "max": ""}
+    },
+    {
+      "id": "B5",
+      "name": "btc-signature-lengths-format-specific",
+      "category": "btc",
+      "severity": "warning",
+      "description": "Transaction signatures: 64 bytes (32R+32S big-endian). Message signatures: 65 bytes (64 + 1 recovery ID). Mismatched length on client fails verification.",
+      "source": "messages/btc.proto",
+      "firmware": {"min": "", "max": ""}
+    },
+    {
+      "id": "B6",
+      "name": "btc-multisig-account-limit-25",
+      "category": "btc",
+      "severity": "warning",
+      "description": "Firmware caps registered multisig accounts at 25 (was 10 pre-v9.6.0). Attempts beyond the limit are rejected.",
+      "source": "CHANGELOG v9.6.0",
+      "firmware": {"min": "", "max": ""}
+    },
+    {
+      "id": "B7",
+      "name": "btc-fee-attack-prev-out-index-check",
+      "category": "btc",
+      "severity": "critical",
+      "description": "From v9.15.0 firmware validates the index of each input's previous output against the supplied prevout (anti-fee-attack). Older firmware accepted inconsistent indexes — silent fee-inflation vector.",
+      "source": "CHANGELOG v9.15.0: 'check index of input's previous output to prevent the fee attack'",
+      "firmware": {"min": "9.15.0", "max": ""}
+    },
+    {
+      "id": "C1",
+      "name": "cardano-max-tx-16kb",
+      "category": "cardano",
+      "severity": "critical",
+      "description": "Cardano transactions are capped at 16384 bytes (CIP-0009). Large token bundles or many UTXO inputs may exceed.",
+      "source": "messages/cardano.proto: CIP-0009 16KB ceiling",
+      "firmware": {"min": "", "max": ""}
+    },
+    {
+      "id": "C2",
+      "name": "cardano-network-mainnet-testnet-only",
+      "category": "cardano",
+      "severity": "critical",
+      "description": "network enum accepts CardanoMainnet (0) or CardanoTestnet (1). Other values are rejected.",
+      "source": "messages/cardano.proto: CardanoNetwork enum",
+      "firmware": {"min": "", "max": ""}
+    },
+    {
+      "id": "C3",
+      "name": "cardano-drep-type-enum-bounded",
+      "category": "cardano",
+      "severity": "hint",
+      "description": "Vote-delegation DRep type accepts KEY_HASH, SCRIPT_HASH, ALWAYS_ABSTAIN, ALWAYS_NO_CONFIDENCE only. Other values are rejected.",
+      "source": "messages/cardano.proto: CardanoCertificate VoteDelegation",
+      "firmware": {"min": "", "max": ""}
+    },
+    {
+      "id": "C4",
+      "name": "cardano-duplicate-token-keys-rejected",
+      "category": "cardano",
+      "severity": "critical",
+      "description": "From v9.9.1, firmware rejects Cardano outputs containing duplicate token keys (same policy_id + asset_name in one output). Pre-v9.9.1 quietly merged — undefined value behaviour.",
+      "source": "CHANGELOG v9.9.1: 'Disallow duplicate token keys in Cardano outputs'",
+      "firmware": {"min": "9.9.1", "max": ""}
+    },
+    {
+      "id": "M1",
+      "name": "mnemonic-18-words-removed",
+      "category": "mnemonic",
+      "severity": "warning",
+      "description": "From v9.24.0 firmware no longer accepts 18-word recovery phrases — only 12 or 24. Clients exposing an 18-word UI flow fail on newer firmware.",
+      "source": "CHANGELOG v9.24.0: 'Removed support for 18-word recovery phrases'",
+      "firmware": {"min": "9.24.0", "max": ""}
+    },
+    {
+      "id": "M2",
+      "name": "mnemonic-final-word-checksum-restricted",
+      "category": "mnemonic",
+      "severity": "hint",
+      "description": "When restoring 12 or 18 (pre-v9.24.0) words, firmware restricts the final word to checksum-valid candidates. Clients must surface only valid candidates, not the full BIP-39 list.",
+      "source": "CHANGELOG v9.16.0",
+      "firmware": {"min": "9.16.0", "max": ""}
+    },
+    {
+      "id": "M3",
+      "name": "mnemonic-zero-seed-words-versioned",
+      "category": "mnemonic",
+      "severity": "hint",
+      "description": "Pre-v9.9.0 firmware rejected recovery phrases deriving a zero seed. v9.9.0 accepts them. Dev test-seeds may behave inconsistently across firmware versions.",
+      "source": "CHANGELOG v9.9.0: 'allow recovery words that convert to a zero seed'",
+      "firmware": {"min": "", "max": "9.9.0"}
+    },
+    {
+      "id": "P1",
+      "name": "pairing-channel-hash-before-confirm",
+      "category": "protocol",
+      "severity": "critical",
+      "description": "bitbox02-api-go's pair() call blocks waiting for on-device confirmation. Channel hash is available BEFORE confirm. Sequential clients display nothing until user has confirmed. Workaround: parallel-poll the channel hash while pair() blocks.",
+      "source": "Observed in production",
+      "firmware": {"min": "", "max": ""}
+    },
+    {
+      "id": "P2",
+      "name": "ble-init-frame-retransmit-must-pass",
+      "category": "protocol",
+      "severity": "critical",
+      "description": "BLE links legitimately retransmit init frames. Plugin-side de-dup logic must NOT drop them — otherwise multi-page signing aborts mid-flow (e.g. 1/13 → 2/13). Historical bug: seenPackets.removeAll() before seenPackets.contains() check.",
+      "source": "Observed in production (multi-page sign abort)",
+      "firmware": {"min": "", "max": ""}
+    },
+    {
+      "id": "P3",
+      "name": "btc-sequence-warning-changed-9.16.0",
+      "category": "protocol",
+      "severity": "hint",
+      "description": "Pre-v9.16.0 firmware emitted a warning for 'unusual' sequence numbers in BTC inputs. v9.16.0 removed it. Clients building cross-version UX must handle both shapes.",
+      "source": "CHANGELOG v9.16.0",
+      "firmware": {"min": "", "max": ""}
+    },
+    {
+      "id": "A1",
+      "name": "gomobile-export-must-recover-panic",
+      "category": "app",
+      "severity": "critical",
+      "description": "Every gomobile-exported function called from the host app must defer-recover, otherwise a Go panic crashes the host. (Analogous: TS WebView bridges must wrap WASM-side throws so the RN side gets a rejected promise rather than a silent stall.)",
+      "source": "Observed across BitBox/Ledger/Trezor plugin patches",
+      "firmware": {"min": "", "max": ""}
+    },
+    {
+      "id": "A2",
+      "name": "transport-timeout-must-be-context-driven",
+      "category": "app",
+      "severity": "critical",
+      "description": "Hard-coded transport timeouts (e.g. 10s) block user-confirm flows where the user takes longer than the timeout. Use context deadlines with confirmation-aware extensions.",
+      "source": "Observed in production (long-confirm flow aborts)",
+      "firmware": {"min": "", "max": ""}
+    },
+    {
+      "id": "A3",
+      "name": "antiklepto-host-nonce-commitment-required",
+      "category": "app",
+      "severity": "warning",
+      "description": "Modern firmware requires a host-nonce commitment phase before signing as anti-klepto protection. Clients skipping this fall back to unprotected signing — exposes key-recovery via biased nonces.",
+      "source": "messages/antiklepto.proto",
+      "firmware": {"min": "", "max": ""}
+    }
+  ]
+}
