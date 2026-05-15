@@ -34,6 +34,10 @@ type CoverageReport struct {
 	// RuntimeOnlyIDs are the quirks with no static signature; absence of
 	// findings tells you nothing about them — they need runtime tests.
 	RuntimeOnlyIDs []string `json:"runtime_only_ids"`
+	// TestCoverage, when provided via --test-results, names quirks
+	// referenced by Jest or `go test` runs. Nil when no test-results file
+	// was supplied.
+	TestCoverage *TestCoverage `json:"test_coverage,omitempty"`
 }
 
 func summarize(findings []Finding) Summary {
@@ -67,13 +71,45 @@ func (r Report) WriteMarkdown(w io.Writer) error {
 
 	// ── Coverage first, so readers can't mistake "0 findings" for "clean" ──
 	fmt.Fprintf(w, "## Coverage\n\n")
-	fmt.Fprintf(w, "Static detection ran against **%d / %d** quirks (%s). The remaining **%d** have no static signature and can only be caught by runtime tests that drive your code against the testkit's Scenario fakes.\n\n",
-		len(r.Coverage.StaticIDs), r.QuirkCount, joinIDs(r.Coverage.StaticIDs), len(r.Coverage.RuntimeOnlyIDs))
 
-	if len(r.Coverage.RuntimeOnlyIDs) > 0 {
-		fmt.Fprintf(w, "<details>\n<summary>Quirks not statically checkable — verify via runtime tests</summary>\n\n")
-		fmt.Fprintf(w, "%s\n\n</details>\n\n", joinIDs(r.Coverage.RuntimeOnlyIDs))
+	// Three-bucket breakdown so the reader sees where the safety net has holes.
+	staticCount := len(r.Coverage.StaticIDs)
+	runtimeOnlyCount := len(r.Coverage.RuntimeOnlyIDs)
+	testCoveredIDs := map[string]bool{}
+	failingTestIDs := map[string]bool{}
+	if r.Coverage.TestCoverage != nil {
+		for _, id := range r.Coverage.TestCoverage.PassingIDs {
+			testCoveredIDs[id] = true
+		}
+		for _, id := range r.Coverage.TestCoverage.FailingIDs {
+			failingTestIDs[id] = true
+		}
 	}
+
+	// Untested = quirks with no static pattern AND no test reference.
+	var untested []string
+	for _, id := range r.Coverage.RuntimeOnlyIDs {
+		if !testCoveredIDs[id] && !failingTestIDs[id] {
+			untested = append(untested, id)
+		}
+	}
+
+	fmt.Fprintf(w, "| Bucket | Count | Quirks |\n|---|---:|---|\n")
+	fmt.Fprintf(w, "| Static detection | %d | %s |\n", staticCount, joinIDs(r.Coverage.StaticIDs))
+	if r.Coverage.TestCoverage != nil {
+		fmt.Fprintf(w, "| Runtime tests passing | %d | %s |\n",
+			len(r.Coverage.TestCoverage.PassingIDs), joinIDs(r.Coverage.TestCoverage.PassingIDs))
+		if len(r.Coverage.TestCoverage.FailingIDs) > 0 {
+			fmt.Fprintf(w, "| Runtime tests **failing** | %d | %s |\n",
+				len(r.Coverage.TestCoverage.FailingIDs), joinIDs(r.Coverage.TestCoverage.FailingIDs))
+		}
+		fmt.Fprintf(w, "| Not covered (write tests!) | %d | %s |\n", len(untested), joinIDs(untested))
+	} else {
+		fmt.Fprintf(w, "| Not statically checkable, no test results provided | %d | %s |\n",
+			runtimeOnlyCount, joinIDs(r.Coverage.RuntimeOnlyIDs))
+		fmt.Fprintf(w, "\n_Pass `--test-results <path>` (Jest `--json --outputFile=…` or `go test -json`) to surface dynamic test coverage._\n")
+	}
+	fmt.Fprintln(w)
 
 	// ── Findings summary ──
 	fmt.Fprintf(w, "## Findings summary\n\n")

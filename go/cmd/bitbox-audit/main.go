@@ -38,20 +38,21 @@ func quirkIDs(qs []quirks.Quirk) []string {
 
 func main() {
 	var (
-		repo     = flag.String("repo", ".", "path to repository to scan")
-		firmware = flag.String("firmware", "", "firmware version (e.g. 9.23.0) — restricts quirks to those applying to this version")
-		format   = flag.String("format", "json", "output format: json | markdown")
-		output   = flag.String("output", "", "write report to file (default: stdout)")
+		repo        = flag.String("repo", ".", "path to repository to scan")
+		firmware    = flag.String("firmware", "", "firmware version (e.g. 9.23.0) — restricts quirks to those applying to this version")
+		format      = flag.String("format", "json", "output format: json | markdown")
+		output      = flag.String("output", "", "write report to file (default: stdout)")
+		testResults = flag.String("test-results", "", "path to Jest --json output OR go test -json output; quirks referenced by passing tests are reported as dynamically covered")
 	)
 	flag.Parse()
 
-	if err := run(*repo, *firmware, *format, *output); err != nil {
+	if err := run(*repo, *firmware, *format, *output, *testResults); err != nil {
 		fmt.Fprintf(os.Stderr, "bitbox-audit: %v\n", err)
 		os.Exit(1)
 	}
 }
 
-func run(repo, firmware, format, output string) error {
+func run(repo, firmware, format, output, testResults string) error {
 	abs, err := absPath(repo)
 	if err != nil {
 		return fmt.Errorf("resolve %q: %w", repo, err)
@@ -64,6 +65,7 @@ func run(repo, firmware, format, output string) error {
 	relevant := quirks.Subset(quirks.Filter{Firmware: firmware})
 	findings := scan(abs, files, relevant)
 	coverage := classify(relevant)
+	testCov := loadTestCoverage(testResults, relevant)
 
 	report := Report{
 		Repo:       abs,
@@ -75,6 +77,7 @@ func run(repo, firmware, format, output string) error {
 		Coverage: CoverageReport{
 			StaticIDs:      quirkIDs(coverage.Static),
 			RuntimeOnlyIDs: quirkIDs(coverage.RuntimeOnly),
+			TestCoverage:   testCov,
 		},
 	}
 
