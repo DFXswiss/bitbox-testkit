@@ -197,24 +197,32 @@ func EthSignMessageBoundary(dev *firmware.Device) Result {
 	})
 }
 
-// EthSignEIP1559Mainnet drives a minimal EIP-1559 transaction through
-// the firmware. We feed a zero-value tx to a zero-address recipient —
-// the firmware accepts it as long as the encoding is wire-correct.
+// EthSignEIP1559Mainnet drives a minimal-but-realistic EIP-1559
+// transaction through the firmware. Values mirror the upstream
+// bitbox02-api-go simulator test (TestSimulatorETHSignEIP1559) — the
+// firmware refuses obviously-zero payloads (zero recipient AND zero
+// value AND zero gas, all together, are not a valid tx). A real
+// transfer of ~0.53 ETH at 6 gwei fee exercises every typed-tx field
+// the firmware validates.
+//
 // The 65-byte signature's last byte is the recovery id (0 or 1 for
 // type-2 EIP-1559; legacy EIP-155 would be 27/28 + chainId scaling).
 func EthSignEIP1559Mainnet(dev *firmware.Device) Result {
 	return run("eth_sign_eip1559_mainnet", func() error {
-		var recipient [20]byte
+		recipient := [20]byte{
+			0x04, 0xf2, 0x64, 0xcf, 0x34, 0x44, 0x03, 0x13, 0xb4, 0xa0,
+			0x19, 0x2a, 0x35, 0x28, 0x14, 0xfb, 0xe9, 0x27, 0xb8, 0x85,
+		}
 		sig, err := dev.ETHSignEIP1559(
-			1,
-			[]uint32{44 + hardened, 60 + hardened, 0 + hardened, 0, 0},
-			0,                       // nonce
-			big.NewInt(1),           // maxPriorityFeePerGas
-			big.NewInt(1),           // maxFeePerGas
-			21000,                   // gasLimit
-			recipient,               // recipient (zero address)
-			big.NewInt(0),           // value
-			nil,                     // data
+			1, // mainnet
+			[]uint32{44 + hardened, 60 + hardened, 0 + hardened, 0, 10},
+			8156,                                     // nonce
+			new(big.Int).SetUint64(0),                // maxPriorityFeePerGas (0 is legal)
+			new(big.Int).SetUint64(6_000_000_000),    // maxFeePerGas (6 gwei)
+			21000,                                    // gasLimit
+			recipient,
+			new(big.Int).SetUint64(530_564_000_000_000_000), // ~0.5305 ETH
+			nil,                                              // data
 			messages.ETHAddressCase_ETH_ADDRESS_CASE_MIXED,
 		)
 		if err != nil {
