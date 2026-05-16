@@ -17,7 +17,7 @@ import (
 
 	"github.com/BitBoxSwiss/bitbox02-api-go/api/firmware"
 	"github.com/BitBoxSwiss/bitbox02-api-go/communication/u2fhid"
-	coresim "github.com/joshuakrueger-dfx/bitbox-testkit/go/core/simulator"
+	coresim "github.com/DFXswiss/bitbox-testkit/go/core/simulator"
 )
 
 // ErrUnsupportedPlatform indicates the host cannot run the BitBox02

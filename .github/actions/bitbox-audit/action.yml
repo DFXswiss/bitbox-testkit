@@ -9,7 +9,7 @@ description: >
 inputs:
   testkit-ref:
     description: >
-      Git ref of joshuakrueger-dfx/bitbox-testkit to install. Pin to a
+      Git ref of DFXswiss/bitbox-testkit to install. Pin to a
       tag (v0.2.0) for reproducibility; use 'main' during testkit
       development to track the bleeding edge.
     required: false
@@ -118,8 +118,8 @@ runs:
         GOPROXY: 'direct'
         GOSUMDB: 'off'
       run: |
-        go install "github.com/joshuakrueger-dfx/bitbox-testkit/go/cmd/bitbox-audit@${{ inputs.testkit-ref }}"
-        go install "github.com/joshuakrueger-dfx/bitbox-testkit/go/cmd/bitbox-audit-explain@${{ inputs.testkit-ref }}"
+        go install "github.com/DFXswiss/bitbox-testkit/go/cmd/bitbox-audit@${{ inputs.testkit-ref }}"
+        go install "github.com/DFXswiss/bitbox-testkit/go/cmd/bitbox-audit-explain@${{ inputs.testkit-ref }}"
 
     - name: Run BitBox-specific Jest tests
       if: inputs.run-jest == 'true' && steps.deps.outcome == 'success'

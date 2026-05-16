@@ -86,6 +86,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ needs.guard.outputs.sha }}
-      - uses: joshuakrueger-dfx/bitbox-testkit/.github/actions/bitbox-simulator@v0.3.0
+      - uses: DFXswiss/bitbox-testkit/.github/actions/bitbox-simulator@v0.3.0
         with:
           testkit-ref: ${{ needs.guard.outputs.testkit-ref }}

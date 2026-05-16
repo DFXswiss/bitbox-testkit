@@ -4,8 +4,8 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/joshuakrueger-dfx/bitbox-testkit/go/bitbox/fake"
-	"github.com/joshuakrueger-dfx/bitbox-testkit/go/bitbox/scenarios"
+	"github.com/DFXswiss/bitbox-testkit/go/bitbox/fake"
+	"github.com/DFXswiss/bitbox-testkit/go/bitbox/scenarios"
 )
 
 // matchInvalidInput is the canonical regex for "this test failed with a

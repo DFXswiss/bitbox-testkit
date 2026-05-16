@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/joshuakrueger-dfx/bitbox-testkit/go/bitbox/quirks"
+	"github.com/DFXswiss/bitbox-testkit/go/bitbox/quirks"
 )
 
 // quirkByID returns a quirk from the package registry. Fails if the ID is

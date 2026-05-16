@@ -11,7 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/joshuakrueger-dfx/bitbox-testkit/go/bitbox/fake"
+	"github.com/DFXswiss/bitbox-testkit/go/bitbox/fake"
 )
 
 // FirmwareError mirrors the wire-level error a real BitBox firmware would

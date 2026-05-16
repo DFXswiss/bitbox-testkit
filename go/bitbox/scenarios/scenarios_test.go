@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/joshuakrueger-dfx/bitbox-testkit/go/bitbox/fake"
-	"github.com/joshuakrueger-dfx/bitbox-testkit/go/bitbox/scenarios"
+	"github.com/DFXswiss/bitbox-testkit/go/bitbox/fake"
+	"github.com/DFXswiss/bitbox-testkit/go/bitbox/scenarios"
 )
 
 func TestDeviceDisconnectAfterN(t *testing.T) {

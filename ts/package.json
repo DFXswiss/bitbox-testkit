@@ -1,5 +1,5 @@
 {
-  "name": "@joshuakrueger-dfx/bitbox-testkit",
+  "name": "@DFXswiss/bitbox-testkit",
   "version": "0.1.0",
   "description": "Test infrastructure for BitBox02 integrations: scriptable fakes, scenario library, source-level regression guards. TypeScript port targeting bitbox-api (Rust/WASM).",
   "license": "MIT",

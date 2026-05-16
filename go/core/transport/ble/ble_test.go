@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/joshuakrueger-dfx/bitbox-testkit/go/core/transport/ble"
+	"github.com/DFXswiss/bitbox-testkit/go/core/transport/ble"
 )
 
 func TestInjectThenReadReturnsBytes(t *testing.T) {

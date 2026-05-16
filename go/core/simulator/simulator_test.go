@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/joshuakrueger-dfx/bitbox-testkit/go/core/simulator"
+	"github.com/DFXswiss/bitbox-testkit/go/core/simulator"
 )
 
 func TestCacheResolveDownloadsAndVerifies(t *testing.T) {

@@ -31,7 +31,7 @@ The TS side currently focuses on the API-fake layer. BLE-transport-faking is Go-
 import (
     "github.com/BitBoxSwiss/bitbox02-api-go/api/firmware"
     "github.com/BitBoxSwiss/bitbox02-api-go/api/firmware/mocks"
-    "github.com/joshuakrueger-dfx/bitbox-testkit/go/bitbox/scenarios"
+    "github.com/DFXswiss/bitbox-testkit/go/bitbox/scenarios"
 )
 
 fake := scenarios.RegressionUmlautEIP712()
@@ -42,7 +42,7 @@ dev := firmware.NewDevice(nil, nil, &mocks.Config{}, fake, &mocks.Logger{})
 ### Drive every applicable quirk in a regression suite
 
 ```go
-import "github.com/joshuakrueger-dfx/bitbox-testkit/go/bitbox/quirks"
+import "github.com/DFXswiss/bitbox-testkit/go/bitbox/quirks"
 
 for _, q := range quirks.Subset(quirks.Filter{
     Category: quirks.CategoryETH,
@@ -60,7 +60,7 @@ for _, q := range quirks.Subset(quirks.Filter{
 ### Static guards on your source
 
 ```go
-import "github.com/joshuakrueger-dfx/bitbox-testkit/go/core/guards"
+import "github.com/DFXswiss/bitbox-testkit/go/core/guards"
 
 func TestSourceGuards(t *testing.T) {
     guards.BitBoxDedupOrder(t, "go/u2fhid", "*.go")
@@ -76,7 +76,7 @@ Build-tagged so dev machines don't download 50 MB on `go test ./...`:
 ```go
 //go:build simulator
 
-import "github.com/joshuakrueger-dfx/bitbox-testkit/go/bitbox/simulator"
+import "github.com/DFXswiss/bitbox-testkit/go/bitbox/simulator"
 
 func TestE2E(t *testing.T) {
     inst, err := simulator.Launch(os.Getenv("WALLET_TESTKIT_SIMCACHE"))
@@ -92,14 +92,14 @@ func TestE2E(t *testing.T) {
 ### Install
 
 ```bash
-npm install --save-dev @joshuakrueger-dfx/bitbox-testkit
+npm install --save-dev @DFXswiss/bitbox-testkit
 ```
 
 ### Mock bitbox-api in a Jest test
 
 ```ts
-import { buildPairedBitBox } from '@joshuakrueger-dfx/bitbox-testkit/fake';
-import { scenarioRegressionUmlautEIP712 } from '@joshuakrueger-dfx/bitbox-testkit/scenarios';
+import { buildPairedBitBox } from '@DFXswiss/bitbox-testkit/fake';
+import { scenarioRegressionUmlautEIP712 } from '@DFXswiss/bitbox-testkit/scenarios';
 
 jest.mock('bitbox-api', () => {
   // Build the fake PairedBitBox once; reuse across the test file.
@@ -119,8 +119,8 @@ it('transliterates umlauts before signTypedMessage', async () => {
 ### Drive every applicable quirk
 
 ```ts
-import { Registry, subset } from '@joshuakrueger-dfx/bitbox-testkit/quirks';
-import { buildPairedBitBox } from '@joshuakrueger-dfx/bitbox-testkit/fake';
+import { Registry, subset } from '@DFXswiss/bitbox-testkit/quirks';
+import { buildPairedBitBox } from '@DFXswiss/bitbox-testkit/fake';
 
 for (const q of subset({ category: 'eth', minSeverity: 'critical' })) {
   it(`handles quirk ${q.id} — ${q.name}`, async () => {
@@ -134,7 +134,7 @@ for (const q of subset({ category: 'eth', minSeverity: 'critical' })) {
 ### Static guards on your source
 
 ```ts
-import { detectNonAsciiInEIP712Literals, expandGlobs } from '@joshuakrueger-dfx/bitbox-testkit/guards';
+import { detectNonAsciiInEIP712Literals, expandGlobs } from '@DFXswiss/bitbox-testkit/guards';
 
 test('no non-ASCII in EIP-712 literals', () => {
   const files = expandGlobs(['src/features/hardware-wallet']);

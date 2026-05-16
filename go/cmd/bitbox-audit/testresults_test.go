@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/joshuakrueger-dfx/bitbox-testkit/go/bitbox/quirks"
+	"github.com/DFXswiss/bitbox-testkit/go/bitbox/quirks"
 )
 
 func TestExtractQuirkIDsFromFullNames(t *testing.T) {

@@ -20,7 +20,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/joshuakrueger-dfx/bitbox-testkit/go/bitbox/fake"
+	"github.com/DFXswiss/bitbox-testkit/go/bitbox/fake"
 )
 
 // Category groups quirks by area of impact.

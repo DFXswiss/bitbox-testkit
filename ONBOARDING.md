@@ -31,8 +31,8 @@ The two implementations share one knowledge base. A consumer in either language 
 ### 1 · Install the CLI on any developer machine
 
 ```bash
-go install github.com/joshuakrueger-dfx/bitbox-testkit/go/cmd/bitbox-audit@main
-go install github.com/joshuakrueger-dfx/bitbox-testkit/go/cmd/bitbox-audit-explain@main
+go install github.com/DFXswiss/bitbox-testkit/go/cmd/bitbox-audit@main
+go install github.com/DFXswiss/bitbox-testkit/go/cmd/bitbox-audit-explain@main
 ```
 
 ### 2 · Audit your repo right now
@@ -57,8 +57,8 @@ In your test names, reference the quirk ID. The audit-runner scans `--test-resul
 Inside your existing test suite:
 
 ```ts
-import { buildPairedBitBox } from '@joshuakrueger-dfx/bitbox-testkit/fake';
-import { scenarioRegressionUmlautEIP712 } from '@joshuakrueger-dfx/bitbox-testkit/scenarios';
+import { buildPairedBitBox } from '@DFXswiss/bitbox-testkit/fake';
+import { scenarioRegressionUmlautEIP712 } from '@DFXswiss/bitbox-testkit/scenarios';
 
 describe('signing — quirk E1 (non-ASCII EIP-712)', () => {
   it('rejects messages containing non-ASCII bytes', async () => {
@@ -117,7 +117,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: joshuakrueger-dfx/bitbox-testkit/.github/actions/bitbox-audit@v0.2.0
+      - uses: DFXswiss/bitbox-testkit/.github/actions/bitbox-audit@v0.2.0
         # Optional inputs:
         # with:
         #   firmware: '9.23.0'           # narrow quirks to a fw range

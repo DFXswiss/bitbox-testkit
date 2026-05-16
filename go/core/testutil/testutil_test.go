@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/joshuakrueger-dfx/bitbox-testkit/go/core/testutil"
+	"github.com/DFXswiss/bitbox-testkit/go/core/testutil"
 )
 
 func TestMustWithinPasses(t *testing.T) {

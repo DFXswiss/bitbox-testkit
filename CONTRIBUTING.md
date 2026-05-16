@@ -87,7 +87,7 @@ Tags follow `v0.MAJOR.MINOR` semver. The TypeScript package and the Go module bo
 
 The Go module lives at `/go/`, so Go's submodule-tagging convention requires **two** tags pointing at the same commit: `vX.Y.Z` for the repo / composite-action ref, and `go/vX.Y.Z` for `go install` to resolve the package. Without the `go/` prefixed tag, consumers hit:
 
-> `module github.com/joshuakrueger-dfx/bitbox-testkit@vX.Y.Z found, but does not contain package …/go/cmd/bitbox-audit`
+> `module github.com/DFXswiss/bitbox-testkit@vX.Y.Z found, but does not contain package …/go/cmd/bitbox-audit`
 
 ```bash
 # Bump version in /ts/package.json

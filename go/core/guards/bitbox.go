@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/joshuakrueger-dfx/bitbox-testkit/go/bitbox/quirks"
+	"github.com/DFXswiss/bitbox-testkit/go/bitbox/quirks"
 )
 
 // RunQuirk applies every detect rule of the named quirk to source files

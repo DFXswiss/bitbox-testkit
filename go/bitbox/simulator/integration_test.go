@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/joshuakrueger-dfx/bitbox-testkit/go/bitbox/simulator"
+	"github.com/DFXswiss/bitbox-testkit/go/bitbox/simulator"
 )
 
 // TestSimulatorRoundtrip launches the newest known BitBox02 simulator and

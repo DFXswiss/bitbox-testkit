@@ -9,7 +9,7 @@ description: >
 inputs:
   testkit-ref:
     description: >
-      Git ref of joshuakrueger-dfx/bitbox-testkit to install. Pin to a
+      Git ref of DFXswiss/bitbox-testkit to install. Pin to a
       tag (v0.3.5) for reproducibility; use 'main' to track the
       bleeding-edge scenarios. NOTE: this controls which CLI version
       gets `go install`-ed; the @vX.Y.Z on the `uses:` line above only
@@ -66,7 +66,7 @@ runs:
         # hosts. We install regardless so workflow_dispatch from a
         # macOS runner still produces a clean report.
         go install -tags simulator \
-          "github.com/joshuakrueger-dfx/bitbox-testkit/go/cmd/bitbox-simulator-check@${{ inputs.testkit-ref }}"
+          "github.com/DFXswiss/bitbox-testkit/go/cmd/bitbox-simulator-check@${{ inputs.testkit-ref }}"
 
     - name: Run simulator scenarios
       id: run

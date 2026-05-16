@@ -34,7 +34,7 @@ import (
 
 	"github.com/BitBoxSwiss/bitbox02-api-go/api/firmware"
 	"github.com/flynn/noise"
-	"github.com/joshuakrueger-dfx/bitbox-testkit/go/bitbox/simulator"
+	"github.com/DFXswiss/bitbox-testkit/go/bitbox/simulator"
 )
 
 func main() {

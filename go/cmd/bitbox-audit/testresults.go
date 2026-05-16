@@ -7,7 +7,7 @@ import (
 	"regexp"
 	"sort"
 
-	"github.com/joshuakrueger-dfx/bitbox-testkit/go/bitbox/quirks"
+	"github.com/DFXswiss/bitbox-testkit/go/bitbox/quirks"
 )
 
 // quirkIDPattern matches references to a quirk ID inside test names.

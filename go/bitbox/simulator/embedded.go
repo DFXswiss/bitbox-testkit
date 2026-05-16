@@ -1,6 +1,6 @@
 package simulator
 
-import coresim "github.com/joshuakrueger-dfx/bitbox-testkit/go/core/simulator"
+import coresim "github.com/DFXswiss/bitbox-testkit/go/core/simulator"
 
 // embedded is the testkit-curated list of BitBox02 simulator binaries.
 // Newest-first. Refresh procedure:

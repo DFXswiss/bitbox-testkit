@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/joshuakrueger-dfx/bitbox-testkit/go/bitbox/simulator"
+	"github.com/DFXswiss/bitbox-testkit/go/bitbox/simulator"
 )
 
 func TestSimulatorsListPopulated(t *testing.T) {

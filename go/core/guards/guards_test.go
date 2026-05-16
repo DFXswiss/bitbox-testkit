@@ -7,7 +7,7 @@ import (
 	"regexp"
 	"testing"
 
-	"github.com/joshuakrueger-dfx/bitbox-testkit/go/core/guards"
+	"github.com/DFXswiss/bitbox-testkit/go/core/guards"
 )
 
 type fakeTB struct {

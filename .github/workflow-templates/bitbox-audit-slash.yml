@@ -115,7 +115,7 @@ jobs:
           TESTKIT_REF: ${{ needs.guard.outputs.testkit-ref }}
           FIRMWARE: ${{ needs.guard.outputs.firmware }}
 
-      - uses: joshuakrueger-dfx/bitbox-testkit/.github/actions/bitbox-audit@v0.2.0
+      - uses: DFXswiss/bitbox-testkit/.github/actions/bitbox-audit@v0.2.0
         with:
           testkit-ref: ${{ needs.guard.outputs.testkit-ref }}
           firmware: ${{ needs.guard.outputs.firmware }}

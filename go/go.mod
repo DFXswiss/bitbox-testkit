@@ -1,4 +1,4 @@
-module github.com/joshuakrueger-dfx/bitbox-testkit/go
+module github.com/DFXswiss/bitbox-testkit/go
 
 go 1.24
 

@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/joshuakrueger-dfx/bitbox-testkit/go/bitbox/quirks"
+	"github.com/DFXswiss/bitbox-testkit/go/bitbox/quirks"
 )
 
 // Finding is the audit-runner-local alias for quirks.Finding so report.go

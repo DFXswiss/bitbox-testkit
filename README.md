@@ -44,8 +44,8 @@ TESTING.md                  full per-layer cookbook
 
 ```bash
 # Audit CLI (runs against any BitBox-integrating repo)
-go install github.com/joshuakrueger-dfx/bitbox-testkit/go/cmd/bitbox-audit@main
-go install github.com/joshuakrueger-dfx/bitbox-testkit/go/cmd/bitbox-audit-explain@main
+go install github.com/DFXswiss/bitbox-testkit/go/cmd/bitbox-audit@main
+go install github.com/DFXswiss/bitbox-testkit/go/cmd/bitbox-audit-explain@main
 
 # TypeScript testkit (Jest / React Native consumers) — npm package coming;
 # for now, vendor /ts/ or install via git URL.

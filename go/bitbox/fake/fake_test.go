@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/BitBoxSwiss/bitbox02-api-go/api/firmware"
-	"github.com/joshuakrueger-dfx/bitbox-testkit/go/bitbox/fake"
+	"github.com/DFXswiss/bitbox-testkit/go/bitbox/fake"
 )
 
 // ensures Fake satisfies the upstream interface at use site too (not just package init)

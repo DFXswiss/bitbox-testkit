@@ -19,7 +19,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/joshuakrueger-dfx/bitbox-testkit/go/bitbox/quirks"
+	"github.com/DFXswiss/bitbox-testkit/go/bitbox/quirks"
 )
 
 // version is overwritten at build time via -ldflags "-X main.version=…".
@@ -54,7 +54,7 @@ Examples:
   bitbox-audit --format json | bitbox-audit-explain
 
 Quirk reference: %d quirks documented (filter with --firmware to narrow).
-Knowledge base: github.com/joshuakrueger-dfx/bitbox-testkit (quirks/SCHEMA.md)
+Knowledge base: github.com/DFXswiss/bitbox-testkit (quirks/SCHEMA.md)
 `
 
 func main() {

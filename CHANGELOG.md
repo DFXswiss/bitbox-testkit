@@ -8,7 +8,7 @@ Patch: refresh SHA-256 pins for the three most-recent simulator binaries (v9.24.
 
 Caught by the first CI run of `bitbox-simulator-check` against `bitbox-api@0.12.0` on PR #153 — exactly the supply-chain-alarm mode the script was designed for. No user action required beyond bumping the testkit ref in consumer workflows from v0.3.0 → v0.3.1.
 
-[v0.3.1]: https://github.com/joshuakrueger-dfx/bitbox-testkit/releases/tag/v0.3.1
+[v0.3.1]: https://github.com/DFXswiss/bitbox-testkit/releases/tag/v0.3.1
 
 ## v0.3.0 — 2026-05-16
 
@@ -25,7 +25,7 @@ End-to-end against real firmware: a new CLI launches the official BitBox02 simul
 
 - ONBOARDING §4 adds a third recommended workflow alongside `bitbox-audit` and the slash command.
 
-[v0.3.0]: https://github.com/joshuakrueger-dfx/bitbox-testkit/releases/tag/v0.3.0
+[v0.3.0]: https://github.com/DFXswiss/bitbox-testkit/releases/tag/v0.3.0
 
 ## v0.2.0 — 2026-05-16
 
@@ -33,7 +33,7 @@ Reusable distribution: one `uses:` step gives any DFX repo a fully wired BitBox 
 
 ### Added
 
-- **Composite GitHub Action** `joshuakrueger-dfx/bitbox-testkit/.github/actions/bitbox-audit@v0.2.0`: encapsulates Go + Node setup, dependency install, Jest `--json`, audit CLI install + run, sticky PR comment, artifact upload. Inputs cover firmware narrowing, `jest-extra-args`, `fail-on-findings`, testkit ref pinning, WASM hash check toggle.
+- **Composite GitHub Action** `DFXswiss/bitbox-testkit/.github/actions/bitbox-audit@v0.2.0`: encapsulates Go + Node setup, dependency install, Jest `--json`, audit CLI install + run, sticky PR comment, artifact upload. Inputs cover firmware narrowing, `jest-extra-args`, `fail-on-findings`, testkit ref pinning, WASM hash check toggle.
 - **Slash-command template** `bitbox-audit-slash.yml`: a maintainer comments `/bitbox-audit [firmware=X] [ref=Y] [fail]` on any PR to trigger an on-demand audit. Authorization gates on `author_association ∈ {OWNER, MEMBER, COLLABORATOR}`.
 - **Workflow templates** registered as `.github/workflow-templates/` so GitHub's "New workflow" UI lists them for any org-owned repo.
 - **Quirk A4** — address-display-on-device-required (consumer must call `BTCAddress(displayOnDevice=true)` for receive flows, else man-in-the-middle on `getAddress` JSON-RPC).
@@ -98,5 +98,5 @@ First release. Establishes the architecture and ships an initial knowledge base 
 - macOS / Windows BitBox02 simulator builds do not exist upstream; the Linux/amd64 simulator integration is the only end-to-end runtime path.
 - Vendor-firmware SHA256s for v9.24.0–v9.26.1 were transcribed from the BitBoxSwiss releases page; a CI download surfaces an explicit hash-mismatch error if upstream rebuilds an artifact, rather than silently substituting tampered content.
 
-[v0.1.0]: https://github.com/joshuakrueger-dfx/bitbox-testkit/releases/tag/v0.1.0
-[v0.2.0]: https://github.com/joshuakrueger-dfx/bitbox-testkit/releases/tag/v0.2.0
+[v0.1.0]: https://github.com/DFXswiss/bitbox-testkit/releases/tag/v0.1.0
+[v0.2.0]: https://github.com/DFXswiss/bitbox-testkit/releases/tag/v0.2.0

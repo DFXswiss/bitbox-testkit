@@ -3,7 +3,7 @@ package quirks_test
 import (
 	"testing"
 
-	"github.com/joshuakrueger-dfx/bitbox-testkit/go/bitbox/quirks"
+	"github.com/DFXswiss/bitbox-testkit/go/bitbox/quirks"
 )
 
 func TestFirmwareRangeApplies(t *testing.T) {
