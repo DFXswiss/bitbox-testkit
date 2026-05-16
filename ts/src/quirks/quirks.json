@@ -327,6 +327,24 @@
       ]
     },
     {
+      "id": "A4",
+      "name": "address-display-on-device-required",
+      "category": "app",
+      "severity": "critical",
+      "description": "Receive-address derivation must show the address on the device screen so the user can verify it on a second channel. A client that fetches addresses with display=false has no way to detect a malicious bridge / WebView returning an attacker-controlled address. This is the canonical second-channel-verification anti-pattern.",
+      "source": "Audit finding CRIT-3 — see bitbox-testkit/AUDIT.md",
+      "firmware": {"min": "", "max": ""},
+      "detect": [
+        {
+          "kind": "regex_in_context",
+          "regex": "displayOnDevice\\s*:\\s*false\\b|display\\s*:\\s*false\\b",
+          "context_regex": "(?i)bitbox|PairedBitBox|ethAddress|btcAddress|cardanoAddress",
+          "reason": "address derivation with displayOnDevice=false in a BitBox context — user cannot verify the address on the device",
+          "fix_hint": "remove the displayOnDevice override; the default is true. If you genuinely need the no-display variant (e.g. background derivation), name the function explicitly to surface the security trade-off in code review"
+        }
+      ]
+    },
+    {
       "id": "A3",
       "name": "antiklepto-host-nonce-commitment-required",
       "category": "app",
