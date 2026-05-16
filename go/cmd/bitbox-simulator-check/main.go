@@ -149,6 +149,27 @@ func buildReport(cacheDirFlag string, failOnSkip bool) Report {
 		return failed(started, host, fmt.Errorf("firmware.Device.Init: %w", err))
 	}
 
+	// Noise XX handshake completed; now wait for the simulator firmware
+	// to mark the pairing as device-confirmed (it auto-confirms within
+	// a few hundred ms — on a physical BitBox this would require the
+	// user to compare + tap on the device screen). Once confirmed, we
+	// acknowledge from the app side via ChannelHashVerify(true), and
+	// the firmware unlocks the rest of the API surface.
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		_, verified := dev.ChannelHash()
+		if verified {
+			dev.ChannelHashVerify(true)
+			break
+		}
+		if time.Now().After(deadline) {
+			return failed(started, host, fmt.Errorf(
+				"firmware.Device: channel-hash never device-verified within 5s — the simulator should auto-confirm",
+			))
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+
 	report := Report{
 		Host:     host,
 		Started:  started,
