@@ -29,6 +29,63 @@ type Result struct {
 // a matrix.
 type Scenario func(dev *firmware.Device) Result
 
+// realUnitUserKycPayload mirrors the EIP-712 typed-data shape that
+// realunit-app's KYC registration flow signs. 13 fields of type
+// string + bool + address — on a physical BitBox each string field
+// is its own confirmation page (the on-device screen renders
+// "1/13", "2/13", … "13/13"). That multi-page flow is exactly where
+// the BLE-Dedup-Bug fixed on 2026-05-14 used to drop the 1/13 → 2/13
+// transition. Including this scenario guards against any future
+// regression in the same code path.
+//
+// ALL string values stay ASCII because the BitBox firmware rejects
+// non-ASCII bytes in EIP-712 string fields with ErrInvalidInput101
+// (quirk E1) — realunit-app fixes this client-side via
+// toBitboxSafeAscii. The simulator follows the same firmware
+// contract, so feeding non-ASCII here would just exercise the
+// reject path; we test the happy path that consumers should be
+// hitting after their own transliteration step.
+const realUnitUserKycPayload = `{
+  "types": {
+    "EIP712Domain": [
+      {"name": "name", "type": "string"},
+      {"name": "version", "type": "string"}
+    ],
+    "RealUnitUser": [
+      {"name": "email", "type": "string"},
+      {"name": "name", "type": "string"},
+      {"name": "type", "type": "string"},
+      {"name": "phoneNumber", "type": "string"},
+      {"name": "birthday", "type": "string"},
+      {"name": "nationality", "type": "string"},
+      {"name": "addressStreet", "type": "string"},
+      {"name": "addressPostalCode", "type": "string"},
+      {"name": "addressCity", "type": "string"},
+      {"name": "addressCountry", "type": "string"},
+      {"name": "swissTaxResidence", "type": "bool"},
+      {"name": "registrationDate", "type": "string"},
+      {"name": "walletAddress", "type": "address"}
+    ]
+  },
+  "primaryType": "RealUnitUser",
+  "domain": {"name": "RealUnitUser", "version": "1"},
+  "message": {
+    "email": "test@dfx.swiss",
+    "name": "Test User",
+    "type": "natural-person",
+    "phoneNumber": "+41123456789",
+    "birthday": "1990-01-01",
+    "nationality": "Switzerland",
+    "addressStreet": "Bahnhofstrasse 1",
+    "addressPostalCode": "8001",
+    "addressCity": "Zurich",
+    "addressCountry": "Switzerland",
+    "swissTaxResidence": true,
+    "registrationDate": "2026-05-16T12:00:00Z",
+    "walletAddress": "0x0000000000000000000000000000000000000000"
+  }
+}`
+
 // BaselineScenarios returns the curated set of probes that exercise
 // the protocol surface every consumer (dfx-wallet, realunit-app) cares
 // about, in roughly the order a real onboarding flow runs them.
@@ -52,6 +109,7 @@ func BaselineScenarios() []Scenario {
 		EthSignMessageAscii,
 		EthSignMessageBoundary,
 		EthSignEIP1559Mainnet,
+		EthSignTypedDataKycMultiPage,
 	}
 }
 
@@ -233,6 +291,46 @@ func EthSignEIP1559Mainnet(dev *firmware.Device) Result {
 		}
 		if sig[64] != 0x00 && sig[64] != 0x01 {
 			return fmt.Errorf("EIP-1559 v byte must be 0x00 or 0x01, got 0x%02x", sig[64])
+		}
+		return nil
+	})
+}
+
+// EthSignTypedDataKycMultiPage exercises the 13-field EIP-712 typed-
+// data sign that realunit-app uses for its KYC registration flow.
+// Each string field renders as its own confirmation page on the
+// physical BitBox screen ("1/13", "2/13", … "13/13"); the simulator
+// auto-confirms each page but the firmware still walks the full
+// multi-page state machine.
+//
+// This scenario guards every multi-page typed-data quirk class:
+//   • The BLE-Dedup-Bug (1/13 → 2/13 transition broken by
+//     seenPackets.removeAll-vs-contains, fixed 2026-05-14 in
+//     bitbox_flutter upstream).
+//   • The Umlaut-Bug (firmware ErrInvalidInput101 on non-ASCII in
+//     EIP-712 string values, fixed 2026-05-15 in realunit-app via
+//     toBitboxSafeAscii). We send only ASCII; consumers should
+//     transliterate BEFORE calling sign.
+//   • Antiklepto host-nonce-commitment exchange (handled inside the
+//     SDK for the high-level ETHSignTypedMessage path).
+func EthSignTypedDataKycMultiPage(dev *firmware.Device) Result {
+	return run("eth_sign_typed_data_kyc_multipage", func() error {
+		sig, err := dev.ETHSignTypedMessage(
+			1, // mainnet
+			[]uint32{44 + hardened, 60 + hardened, 0 + hardened, 0, 0},
+			[]byte(realUnitUserKycPayload),
+		)
+		if err != nil {
+			return fmt.Errorf("ETHSignTypedMessage(KYC 13-page): %w", err)
+		}
+		if len(sig) != 65 {
+			return fmt.Errorf("expected 65-byte sig, got %d", len(sig))
+		}
+		// EIP-712 typed-data uses 27/28 recovery byte like personal sign
+		// (NOT the {0,1} parity of EIP-1559) because it's a "signed
+		// message"-style signature, not a transaction signature.
+		if sig[64] != 27 && sig[64] != 28 {
+			return fmt.Errorf("expected v ∈ {27,28} for typed-data sign, got %d", sig[64])
 		}
 		return nil
 	})
