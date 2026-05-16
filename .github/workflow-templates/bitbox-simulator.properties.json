@@ -1,0 +1,7 @@
+{
+  "name": "BitBox simulator",
+  "description": "Launches the official BitBox02 simulator binary and runs the testkit's baseline scenarios against real firmware logic. Sticky PR comment with pass/fail per scenario.",
+  "iconName": "cpu",
+  "categories": ["Security", "Code quality"],
+  "filePatterns": ["**/*.ts", "**/*.tsx", "**/*.go", "**/*.dart", "**/*.kt", "**/*.swift"]
+}

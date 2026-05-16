@@ -2,6 +2,23 @@
 
 All notable changes to bitbox-testkit. The project uses semantic versioning starting from v0.1.0.
 
+## v0.3.0 — 2026-05-16
+
+End-to-end against real firmware: a new CLI launches the official BitBox02 simulator binary and runs the testkit's curated baseline scenarios — pair, deviceInfo, get-address (mainnet + Polygon multi-byte v), sign-message (small + 1024-byte boundary), sign-EIP1559 — against the actual firmware logic. Replaces mock-only test coverage with real-firmware validation for every consumer.
+
+### Added
+
+- **`bitbox-simulator-check` CLI** (`go/cmd/bitbox-simulator-check`): launches the simulator from the embedded SHA-pinned list (currently v9.19.0 through v9.26.1), exercises BaselineScenarios, emits JSON or Markdown report, exits non-zero on scenario failure. Linux/amd64 only — on macOS / Windows / arm Linux the CLI exits cleanly with a "skipped" status so cross-platform CI matrices stay simple.
+- **`go/bitbox/simulator/scenarios.go`**: typed Scenario library. BaselineScenarios() returns the curated set every DFX consumer cares about — extendable by future quirks.
+- **Composite action `.github/actions/bitbox-simulator/action.yml`**: one-line `uses:` step for any DFX repo. Inputs: `testkit-ref`, `comment-on-pr`, `fail-on-findings`, `fail-on-skip`.
+- **Workflow templates** `bitbox-simulator.yml` (auto-trigger) and `bitbox-simulator-slash.yml` (`/bitbox-simulator` comment trigger with author_association auth gate).
+
+### Changed
+
+- ONBOARDING §4 adds a third recommended workflow alongside `bitbox-audit` and the slash command.
+
+[v0.3.0]: https://github.com/joshuakrueger-dfx/bitbox-testkit/releases/tag/v0.3.0
+
 ## v0.2.0 — 2026-05-16
 
 Reusable distribution: one `uses:` step gives any DFX repo a fully wired BitBox audit. Quirk count climbs from 30 → 31; static detection from 7 → 11.

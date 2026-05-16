@@ -1,0 +1,113 @@
+name: bitbox-simulator
+description: >
+  Launch the official BitBox02 simulator and exercise the testkit's
+  baseline scenarios against real firmware logic. Linux/amd64 only —
+  on other hosts the action exits cleanly with a "skipped" status so
+  cross-platform CI matrices stay simple. One-line drop-in for any
+  DFX repo: add a workflow that calls this action.
+
+inputs:
+  testkit-ref:
+    description: >
+      Git ref of joshuakrueger-dfx/bitbox-testkit to install. Pin to a
+      tag (v0.3.0) for reproducibility; use 'main' to track the
+      bleeding-edge scenarios.
+    required: false
+    default: v0.3.0
+  comment-on-pr:
+    description: >
+      'true' to post the markdown report as a sticky PR comment.
+      Requires pull-requests: write permission on the workflow.
+    required: false
+    default: 'true'
+  fail-on-findings:
+    description: >
+      'true' to exit non-zero (block the PR) when ANY scenario fails.
+      Default fails the job on real failure; non-Linux hosts always
+      pass (the simulator is Linux-only).
+    required: false
+    default: 'true'
+  fail-on-skip:
+    description: >
+      'true' to also fail the job when run on a non-Linux host. Off
+      by default so a macOS or Windows runner doesn't surface as a
+      red check just because the simulator can't run there.
+    required: false
+    default: 'false'
+
+outputs:
+  report-path:
+    description: Path to the rendered markdown report.
+    value: ${{ steps.run.outputs.report-path }}
+  findings-json-path:
+    description: Path to the raw JSON results.
+    value: ${{ steps.run.outputs.findings-json-path }}
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.24'
+        cache: false
+
+    - name: Install bitbox-simulator-check
+      shell: bash
+      env:
+        GOPROXY: 'direct'
+        GOSUMDB: 'off'
+      run: |
+        # The simulator binary itself is linux/amd64-only; the Go CLI
+        # cross-compiles fine and reports a "skipped" status on other
+        # hosts. We install regardless so workflow_dispatch from a
+        # macOS runner still produces a clean report.
+        go install -tags simulator \
+          "github.com/joshuakrueger-dfx/bitbox-testkit/go/cmd/bitbox-simulator-check@${{ inputs.testkit-ref }}"
+
+    - name: Run simulator scenarios
+      id: run
+      shell: bash
+      env:
+        FAIL_ON_FINDINGS: ${{ inputs.fail-on-findings }}
+        FAIL_ON_SKIP: ${{ inputs.fail-on-skip }}
+      run: |
+        set -o pipefail
+        mkdir -p .bitbox-simulator
+        flags=()
+        if [ "$FAIL_ON_SKIP" = "true" ]; then flags+=(--fail-on-skip); fi
+
+        # JSON first so the markdown render can reuse the SAME run.
+        rc=0
+        bitbox-simulator-check --format json --output .bitbox-simulator/results.json "${flags[@]}" \
+          || rc=$?
+        bitbox-simulator-check --format markdown --output .bitbox-simulator/report.md "${flags[@]}" \
+          || true
+
+        echo "report-path=.bitbox-simulator/report.md" >> "$GITHUB_OUTPUT"
+        echo "findings-json-path=.bitbox-simulator/results.json" >> "$GITHUB_OUTPUT"
+
+        cat .bitbox-simulator/report.md
+
+        if [ "$rc" -ne 0 ] && [ "$FAIL_ON_FINDINGS" = "true" ]; then
+          echo "::error::BitBox simulator scenarios failed (exit $rc)."
+          exit "$rc"
+        fi
+
+    - name: Comment on PR
+      if: inputs.comment-on-pr == 'true' && github.event_name == 'pull_request'
+      uses: marocchino/sticky-pull-request-comment@v2
+      with:
+        header: bitbox-simulator
+        path: ${{ steps.run.outputs.report-path }}
+
+    - name: Upload simulator artefacts
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: bitbox-simulator
+        path: |
+          .bitbox-simulator/results.json
+          .bitbox-simulator/report.md
+        if-no-files-found: ignore
+        retention-days: 14
