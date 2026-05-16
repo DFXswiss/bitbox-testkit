@@ -110,6 +110,7 @@ func BaselineScenarios() []Scenario {
 		EthSignMessageBoundary,
 		EthSignEIP1559Mainnet,
 		EthSignTypedDataKycMultiPage,
+		EthSignTypedDataNonAsciiRejected,
 	}
 }
 
@@ -331,6 +332,105 @@ func EthSignTypedDataKycMultiPage(dev *firmware.Device) Result {
 		// message"-style signature, not a transaction signature.
 		if sig[64] != 27 && sig[64] != 28 {
 			return fmt.Errorf("expected v ∈ {27,28} for typed-data sign, got %d", sig[64])
+		}
+		return nil
+	})
+}
+
+// realUnitUserKycPayloadWithUmlauts is the SAME 13-field EIP-712
+// typed-data as the happy-path KYC payload, but with realistic German /
+// Swiss umlauts and accents in three fields: name (ü), addressStreet
+// (ß), addressCity (ü). Every other field stays ASCII to isolate the
+// umlaut rejection to those specific fields.
+//
+// We expect the BitBox firmware to REJECT this with ErrInvalidInput101
+// (quirk E1). Consumers are responsible for transliterating via
+// toBitboxSafeAscii BEFORE calling sign — this scenario guards
+// against the firmware ever silently starting to accept non-ASCII
+// (which would be a confusing partial-success path where the
+// consumer's transliteration becomes load-bearing for one firmware
+// version and dead code for the next).
+const realUnitUserKycPayloadWithUmlauts = `{
+  "types": {
+    "EIP712Domain": [
+      {"name": "name", "type": "string"},
+      {"name": "version", "type": "string"}
+    ],
+    "RealUnitUser": [
+      {"name": "email", "type": "string"},
+      {"name": "name", "type": "string"},
+      {"name": "type", "type": "string"},
+      {"name": "phoneNumber", "type": "string"},
+      {"name": "birthday", "type": "string"},
+      {"name": "nationality", "type": "string"},
+      {"name": "addressStreet", "type": "string"},
+      {"name": "addressPostalCode", "type": "string"},
+      {"name": "addressCity", "type": "string"},
+      {"name": "addressCountry", "type": "string"},
+      {"name": "swissTaxResidence", "type": "bool"},
+      {"name": "registrationDate", "type": "string"},
+      {"name": "walletAddress", "type": "address"}
+    ]
+  },
+  "primaryType": "RealUnitUser",
+  "domain": {"name": "RealUnitUser", "version": "1"},
+  "message": {
+    "email": "test@dfx.swiss",
+    "name": "Jürg Müller",
+    "type": "natural-person",
+    "phoneNumber": "+41123456789",
+    "birthday": "1990-01-01",
+    "nationality": "Switzerland",
+    "addressStreet": "Bahnhofstraße 1",
+    "addressPostalCode": "8001",
+    "addressCity": "Zürich",
+    "addressCountry": "Switzerland",
+    "swissTaxResidence": true,
+    "registrationDate": "2026-05-16T12:00:00Z",
+    "walletAddress": "0x0000000000000000000000000000000000000000"
+  }
+}`
+
+// EthSignTypedDataNonAsciiRejected feeds the same 13-field RealUnitUser
+// typed-data structure as the happy-path scenario but with German /
+// Swiss umlauts (ü, ß) in the name, addressStreet, and addressCity
+// fields. The BitBox firmware MUST reject this with ErrInvalidInput101
+// (quirk E1, observed 2026-05-15 on realunit-app and fixed via
+// toBitboxSafeAscii client-side transliteration).
+//
+// A passing "happy" sign here would actually be a firmware regression
+// — it would mean a future BitBox build started accepting non-ASCII
+// silently, leaving consumer-side transliteration as load-bearing
+// dead code (works on new firmware, breaks the moment user holds an
+// older device). Failing-as-expected here is the GREEN state for
+// this scenario.
+//
+// If this scenario ever passes (sign returns 65 bytes), the upstream
+// firmware contract changed and quirk E1 needs to be re-classified.
+func EthSignTypedDataNonAsciiRejected(dev *firmware.Device) Result {
+	return run("eth_sign_typed_data_non_ascii_rejected", func() error {
+		_, err := dev.ETHSignTypedMessage(
+			1, // mainnet
+			[]uint32{44 + hardened, 60 + hardened, 0 + hardened, 0, 0},
+			[]byte(realUnitUserKycPayloadWithUmlauts),
+		)
+		if err == nil {
+			return errors.New(
+				"FIRMWARE CONTRACT CHANGED: ETHSignTypedMessage accepted non-ASCII; " +
+					"quirk E1 (Umlaut-Bug) may no longer apply. Verify upstream and " +
+					"re-classify in quirks.json before consumers can drop their " +
+					"toBitboxSafeAscii transliteration step.",
+			)
+		}
+		// Either a wire-level firmware error or a JSON-encoding-step
+		// rejection is acceptable — both mean "umlauts are not safe to
+		// pass through to the BitBox without transliteration".
+		msg := err.Error()
+		if !strings.Contains(msg, "invalid input") && !strings.Contains(msg, "101") {
+			return fmt.Errorf(
+				"unexpected error class for non-ASCII typed-data: %w (expected 'invalid input' or code 101)",
+				err,
+			)
 		}
 		return nil
 	})
