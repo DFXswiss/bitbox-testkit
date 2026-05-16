@@ -22,17 +22,17 @@ var embedded = []coresim.Binary{
 	{
 		Name:   "bitbox02-multi-v9.26.1-simulator1.0.0-linux-amd64",
 		URL:    "https://github.com/BitBoxSwiss/bitbox02-firmware/releases/download/firmware%2Fv9.26.1/bitbox02-multi-v9.26.1-simulator1.0.0-linux-amd64",
-		SHA256: "8fde0ab07ee6db178e741cb619b2c7d8452e4731d0c3d6dfe9a20687221e4cbf",
+		SHA256: "91ddf47eb0653ce8b3d3344a8e329fc7fef90adfa51e39c5214830cf6e21cccf",
 	},
 	{
 		Name:   "bitbox02-multi-v9.25.0-simulator1.0.0-linux-amd64",
 		URL:    "https://github.com/BitBoxSwiss/bitbox02-firmware/releases/download/firmware%2Fv9.25.0/bitbox02-multi-v9.25.0-simulator1.0.0-linux-amd64",
-		SHA256: "9884fe9053d83621345f09ea18c125a5677877779d5ab59f4d2f42a850ab6d8c",
+		SHA256: "0ba19e82930cc90a8d1f4eb3fc8faf0dc5784ab0a1e4e1b112c90946bd4b3062",
 	},
 	{
 		Name:   "bitbox02-multi-v9.24.0-simulator1.0.0-linux-amd64",
 		URL:    "https://github.com/BitBoxSwiss/bitbox02-firmware/releases/download/firmware%2Fv9.24.0/bitbox02-multi-v9.24.0-simulator1.0.0-linux-amd64",
-		SHA256: "8def1ffb8b17f91673158782033513a3d9bbd1174b0c415fb651d2b904f2dfbc",
+		SHA256: "a64cefb90461f479e373b5f5dee4f340f07b4619fbcb55c87784f541b4400e34",
 	},
 	{
 		Name:   "bitbox02-multi-v9.23.0-simulator1.0.0-linux-amd64",
