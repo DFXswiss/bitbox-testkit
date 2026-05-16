@@ -1,9 +1,9 @@
-name: test
+name: PR checks
 
 on:
-  push:
-    branches: [main]
   pull_request:
+  push:
+    branches: [develop, main]
 
 permissions:
   contents: read
