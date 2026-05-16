@@ -112,7 +112,10 @@ jobs:
       - name: run composite action against this repo
         uses: ./.github/actions/bitbox-audit
         with:
-          testkit-ref: ${{ github.sha }}
+          # `local` builds the CLI from the checked-out source. We can't
+          # use `${{ github.sha }}` because PR builds resolve that to a
+          # synthetic merge commit that's not reachable to `go install`.
+          testkit-ref: local
           run-jest: 'false'
           comment-on-pr: 'false'
           wasm-hash-check: 'false'
