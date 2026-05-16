@@ -134,7 +134,16 @@
       "severity": "critical",
       "description": "BTCSignInitRequest.version must be 1 or 2. Other transaction versions are rejected.",
       "source": "messages/btc.proto: version field",
-      "firmware": {"min": "", "max": ""}
+      "firmware": {"min": "", "max": ""},
+      "detect": [
+        {
+          "kind": "regex_in_context",
+          "regex": "\\bversion\\s*[:=]\\s*([3-9]|[1-9]\\d+)\\b",
+          "context_regex": "(?i)btcSign|BTCSignInitRequest|btc[A-Z][A-Za-z]*Sign|signPsbt",
+          "reason": "hardcoded BTC transaction version outside {1, 2} — firmware will reject",
+          "fix_hint": "use version=2 (default for modern wallets) or version=1; never 0 or 3+"
+        }
+      ]
     },
     {
       "id": "B3",
@@ -197,7 +206,16 @@
       "severity": "critical",
       "description": "network enum accepts CardanoMainnet (0) or CardanoTestnet (1). Other values are rejected.",
       "source": "messages/cardano.proto: CardanoNetwork enum",
-      "firmware": {"min": "", "max": ""}
+      "firmware": {"min": "", "max": ""},
+      "detect": [
+        {
+          "kind": "regex_in_context",
+          "regex": "\\b(?:cardanoNetwork|network|CardanoNetwork)\\s*[:=]\\s*([2-9]|\\d{2,})\\b",
+          "context_regex": "(?i)cardano|CardanoSign|cardanoAddress|cardanoXpubs",
+          "reason": "hardcoded Cardano network value outside {0 (Mainnet), 1 (Testnet)} — firmware will reject",
+          "fix_hint": "use the CardanoNetwork enum (Mainnet=0, Testnet=1); other values are not supported"
+        }
+      ]
     },
     {
       "id": "C3",
@@ -351,7 +369,17 @@
       "severity": "warning",
       "description": "Modern firmware requires a host-nonce commitment phase before signing as anti-klepto protection. Clients skipping this fall back to unprotected signing — exposes key-recovery via biased nonces.",
       "source": "messages/antiklepto.proto",
-      "firmware": {"min": "", "max": ""}
+      "firmware": {"min": "", "max": ""},
+      "detect": [
+        {
+          "kind": "missing_pair_within",
+          "regex": "\\bethSign(?:Transaction|1559Transaction|Message|TypedMessage)\\b\\s*\\(",
+          "pair_regex": "antiklepto|hostNonceCommitment|host_nonce_commitment|nonceCommitment",
+          "within_lines": 50,
+          "reason": "ETH sign call without a paired antiklepto / host_nonce_commitment reference within 50 lines — modern firmware expects the commitment phase",
+          "fix_hint": "before each ethSign* call, run the host-nonce-commitment exchange; bitbox-api wraps this automatically when you use the high-level API"
+        }
+      ]
     }
   ]
 }

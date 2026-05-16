@@ -167,6 +167,74 @@ func TestScanFlagsB1LocktimeOverflow(t *testing.T) {
 	}
 }
 
+func TestScanFlagsB2HardcodedVersion(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "bad-sign.ts", `import { btcSignPsbt } from 'bitbox-api';
+const tx = { version: 3, locktime: 0 };
+btcSignPsbt(tx);
+`)
+	files, _ := enumerateSources(dir)
+	got := scan(dir, files, []quirks.Quirk{quirkByID(t, "B2")})
+	if len(got) == 0 {
+		t.Fatal("expected B2 finding for version:3 in BTC sign context")
+	}
+}
+
+func TestScanB2IgnoresVersionOutsideBtcContext(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "build.ts", `const pkg = { version: 3 };`)
+	files, _ := enumerateSources(dir)
+	got := scan(dir, files, []quirks.Quirk{quirkByID(t, "B2")})
+	if len(got) != 0 {
+		t.Fatalf("expected 0 B2 findings outside BTC context, got %d", len(got))
+	}
+}
+
+func TestScanFlagsC2BadCardanoNetwork(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "cardano-flow.ts", `import { cardanoAddress } from 'bitbox-api';
+cardanoAddress({ network: 5 });
+`)
+	files, _ := enumerateSources(dir)
+	got := scan(dir, files, []quirks.Quirk{quirkByID(t, "C2")})
+	if len(got) == 0 {
+		t.Fatal("expected C2 finding for network:5 in Cardano context")
+	}
+}
+
+func TestScanA3FlagsEthSignWithoutAntiklepto(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "no-antiklepto.ts", `import { ethSignTransaction } from 'bitbox-api';
+export async function send(rlp: Uint8Array) {
+  return ethSignTransaction(1n, "m/44'/60'/0'/0/0", rlp);
+}
+`)
+	files, _ := enumerateSources(dir)
+	got := scan(dir, files, []quirks.Quirk{quirkByID(t, "A3")})
+	if len(got) == 0 {
+		t.Fatal("expected A3 finding for ethSign* without antiklepto reference nearby")
+	}
+}
+
+func TestScanA3SilentWhenAntikleptoPresent(t *testing.T) {
+	// missing_pair_within scans forward (the recoverPanic-style semantic).
+	// To suppress A3, the antiklepto reference must appear on a line
+	// AFTER the ethSign* call within the window (default 50 lines).
+	dir := t.TempDir()
+	writeFile(t, dir, "with-antiklepto.ts", `import { ethSignTransaction } from 'bitbox-api';
+export async function send(rlp: Uint8Array) {
+  const sig = await ethSignTransaction(1n, "m/44'/60'/0'/0/0", rlp);
+  // bitbox-api wraps host_nonce_commitment / antiklepto automatically.
+  return sig;
+}
+`)
+	files, _ := enumerateSources(dir)
+	got := scan(dir, files, []quirks.Quirk{quirkByID(t, "A3")})
+	if len(got) != 0 {
+		t.Fatalf("expected 0 A3 findings when antiklepto appears within window after ethSign*, got %d", len(got))
+	}
+}
+
 func TestScanFlagsA1GomobileExportWithoutContext(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, dir, "exports.go", `package main
