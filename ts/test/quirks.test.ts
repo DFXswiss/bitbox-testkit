@@ -1,8 +1,12 @@
 import { Registry, subset, firmwareApplies } from '../src/quirks/index.js';
+// Plain import (no `with { type: 'json' }`) keeps the test runnable under
+// ts-jest, matching the loader's import style — see loader.ts for context.
+import rawJson from '../src/quirks/quirks.json';
 
 describe('quirks registry', () => {
-  it('loads all 30 quirks from quirks.json', () => {
-    expect(Registry.length).toBe(30);
+  it('loads every quirk from quirks.json', () => {
+    expect(Registry.length).toBeGreaterThan(0);
+    expect(Registry.length).toBe((rawJson as { quirks: unknown[] }).quirks.length);
   });
 
   it('has no duplicate IDs', () => {

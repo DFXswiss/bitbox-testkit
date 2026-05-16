@@ -1,5 +1,9 @@
 //go:build simulator
 
+// audit-skip-file: this file is the simulator scenario library. The umlaut
+// payloads exist precisely to exercise quirk E1 (non-ASCII rejection); they
+// are test data, not production strings to flag.
+
 package simulator
 
 import (

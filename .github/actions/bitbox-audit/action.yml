@@ -11,7 +11,10 @@ inputs:
     description: >
       Git ref of DFXswiss/bitbox-testkit to install. Pin to a
       tag (v0.2.0) for reproducibility; use 'main' during testkit
-      development to track the bleeding edge.
+      development to track the bleeding edge. The sentinel value
+      'local' is reserved for the testkit's own self-test workflow
+      and builds the CLI from the checked-out source — consumers
+      should never set it.
     required: false
     default: v0.2.0
   firmware:
@@ -117,9 +120,23 @@ runs:
       env:
         GOPROXY: 'direct'
         GOSUMDB: 'off'
+        TESTKIT_REF: ${{ inputs.testkit-ref }}
+        ACTION_PATH: ${{ github.action_path }}
       run: |
-        go install "github.com/DFXswiss/bitbox-testkit/go/cmd/bitbox-audit@${{ inputs.testkit-ref }}"
-        go install "github.com/DFXswiss/bitbox-testkit/go/cmd/bitbox-audit-explain@${{ inputs.testkit-ref }}"
+        set -euo pipefail
+        if [ "$TESTKIT_REF" = "local" ]; then
+          # Self-test path: build from the checked-out testkit source.
+          # PR builds run as `github.sha`, the synthetic merge commit,
+          # which is not in `refs/heads/*` and therefore unreachable to
+          # `go install`. The local build sidesteps that and tests the
+          # exact code in the PR.
+          src="$(cd "$ACTION_PATH/../../.." && pwd)/go"
+          echo "::notice::testkit-ref=local — building CLI from $src"
+          (cd "$src" && go install ./cmd/bitbox-audit ./cmd/bitbox-audit-explain)
+        else
+          go install "github.com/DFXswiss/bitbox-testkit/go/cmd/bitbox-audit@$TESTKIT_REF"
+          go install "github.com/DFXswiss/bitbox-testkit/go/cmd/bitbox-audit-explain@$TESTKIT_REF"
+        fi
 
     - name: Run BitBox-specific Jest tests
       if: inputs.run-jest == 'true' && steps.deps.outcome == 'success'
