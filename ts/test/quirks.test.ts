@@ -4,7 +4,11 @@ import { Registry, subset, firmwareApplies } from '../src/quirks/index.js';
 import rawJson from '../src/quirks/quirks.json';
 
 describe('quirks registry', () => {
-  it('loads every quirk from quirks.json', () => {
+  // Self-consistent count: the Registry MUST expose exactly the number
+  // of quirks documented in quirks.json. Hardcoded numbers go stale
+  // every release; reading the source-of-truth keeps the assertion
+  // load-bearing without needing a manual bump.
+  it('loads every quirk from quirks.json into the Registry', () => {
     expect(Registry.length).toBeGreaterThan(0);
     expect(Registry.length).toBe((rawJson as { quirks: unknown[] }).quirks.length);
   });
