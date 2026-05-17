@@ -1,12 +1,12 @@
 /**
- * Main entry point of @joshuakrueger-dfx/bitbox-testkit.
+ * Main entry point of @DFXswiss/bitbox-testkit.
  *
  * Consumers typically import from the namespaced subpaths:
  *
- *   import { FakePairedBitBox } from '@joshuakrueger-dfx/bitbox-testkit/fake';
- *   import { Registry, subset } from '@joshuakrueger-dfx/bitbox-testkit/quirks';
- *   import { scenarioRegressionUmlautEIP712 } from '@joshuakrueger-dfx/bitbox-testkit/scenarios';
- *   import { detectNonAsciiInEIP712Literals } from '@joshuakrueger-dfx/bitbox-testkit/guards';
+ *   import { FakePairedBitBox } from '@DFXswiss/bitbox-testkit/fake';
+ *   import { Registry, subset } from '@DFXswiss/bitbox-testkit/quirks';
+ *   import { scenarioRegressionUmlautEIP712 } from '@DFXswiss/bitbox-testkit/scenarios';
+ *   import { detectNonAsciiInEIP712Literals } from '@DFXswiss/bitbox-testkit/guards';
  *
  * The default export re-exposes everything for convenience.
  */

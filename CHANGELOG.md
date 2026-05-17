@@ -2,7 +2,7 @@
 
 All notable changes to bitbox-testkit. The project uses semantic versioning starting from v0.1.0.
 
-## v0.5.0 — 2026-05-16
+## v0.5.0 — 2026-05-17
 
 The "world-class" release: the baseline grows from 9 to 14 scenarios, covers Bitcoin alongside Ethereum, asserts a deterministic identity contract for the simulator seed, and now ships a multi-firmware matrix runner. The testkit self-audit is now green on its own source tree.
 
@@ -18,21 +18,29 @@ The "world-class" release: the baseline grows from 9 to 14 scenarios, covers Bit
 - **`simulator.Connect` helper** factors the Noise XX bring-up + channel-hash-verify wait out of the CLI so the integration test, `cmd/bitbox-simulator-check`, and any future consumer share one canonical implementation. Tunable via `ConnectOptions{HandshakeTimeout, Logger}`.
 - **`simulator.LaunchVersion(cacheDir, name)` + `ErrSimulatorNotFound`** lets a caller pin a specific embedded binary instead of always getting the newest one.
 - **`bitbox-simulator-check --firmware <name|all>`** flag: matrix-runs the full baseline against every embedded firmware (v9.19.0 → v9.26.1) and emits a `MatrixReport` with a per-firmware pass/fail table. Single-firmware runs remain shape-compatible (`MatrixReport.Reports[0]` is the legacy `Report`).
-- **CI: `go-simulator-matrix` job** in the testkit's own `test.yml` runs the baseline against each of the 8 embedded firmwares in parallel on every push, catching regressions that only surface on the long tail of older firmwares users still have in production.
+- **CI: `go-simulator-matrix` job** in the testkit's own `test.yaml` runs the baseline against each of the 8 embedded firmwares in parallel on every push, catching regressions that only surface on the long tail of older firmwares users still have in production.
 - **CI: `TestSimulatorBaselineScenarios`** integration test executes every scenario against the real firmware on every push, replacing the previous "Launch only" smoke check. Surfaces scenario regressions at testkit-CI time instead of consumer time.
 
 ### Changed
 
 - `cmd/bitbox-simulator-check`: report wire format is now `MatrixReport { Reports: [...] }` even for single-firmware runs. The CLI's exit-code semantics are unchanged (max of per-firmware exit codes).
-- Umlaut KYC fixture payload now uses JSON `ü` / `ß` escapes rather than literal non-ASCII bytes. Equivalent at the wire layer (JSON parser resolves the escapes), but keeps the source file pure ASCII so the testkit's own self-audit stays green without `audit-skip-line` markers cluttering the file.
 - TS `FakePairedBitBox`: proxy now ignores symbol-keyed lookups and returns `undefined` for `then` / `catch` / `finally`, so awaiting the proxy no longer infects the awaiter chain as if the proxy were thenable. Plus new `clearCalls()` for tests that want to reset the recorded call log mid-flight without releasing the fake.
 
-### Fixed
+[v0.5.0]: https://github.com/DFXswiss/bitbox-testkit/releases/tag/v0.5.0
 
-- `audit-skip-line` marker (added in v0.4.4) is now actually wired through `detect.go`'s post-scan filter — previous versions documented the marker but never honoured it, so the 3 false-positive critical findings on dfx-wallet's `bitbox.ts:605` and `types.ts:62` doc comments leaked into every audit run.
-- Testkit `quirks.test.ts` reads `quirks.json` directly instead of asserting a hardcoded count, so adding a quirk no longer requires a paired test-edit (the previous "expected 30, got 31" red was the symptom).
+## v0.4.6 — 2026-05-16
 
-[v0.5.0]: https://github.com/joshuakrueger-dfx/bitbox-testkit/releases/tag/v0.5.0
+CI and release plumbing aligned with the bitbox_flutter / DFXswiss org template — `develop` is now the default branch, push-to-develop opens an auto-release-pr (develop → main), merging that triggers an auto-tag that patch-bumps `vX.Y.Z` AND `go/vX.Y.Z` (Go submodule resolver needs both at the same commit).
+
+`composite action self-test` was failing on the umlaut payload inside `go/bitbox/simulator/scenarios.go`; suppressed via `audit-skip-file` (the umlauts are intentional test fixtures for quirk E1). `quirks.test.ts` switched from a hardcoded `30` count to a self-deriving assertion against the imported `quirks.json` so the test never goes stale when a quirk is added.
+
+[v0.4.6]: https://github.com/DFXswiss/bitbox-testkit/releases/tag/v0.4.6
+
+## v0.4.5 — 2026-05-16
+
+Go module path renamed from `github.com/joshuakrueger-dfx/bitbox-testkit` to `github.com/DFXswiss/bitbox-testkit` — the canonical home is now the org-owned mirror. Consumers must update their `go install` / `go.mod` references; composite-action references should also be re-pointed from the personal account to `DFXswiss/`.
+
+[v0.4.5]: https://github.com/DFXswiss/bitbox-testkit/releases/tag/v0.4.5
 
 ## v0.4.4 — 2026-05-16
 

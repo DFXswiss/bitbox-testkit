@@ -179,7 +179,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: joshuakrueger-dfx/bitbox-testkit/.github/actions/bitbox-simulator@v0.5.0
+      - uses: DFXswiss/bitbox-testkit/.github/actions/bitbox-simulator@v0.5.0
         with:
           testkit-ref: v0.5.0
           # Optional:

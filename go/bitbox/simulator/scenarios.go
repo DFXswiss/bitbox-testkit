@@ -362,17 +362,9 @@ func EthSignTypedDataKycMultiPage(dev *firmware.Device) Result {
 
 // realUnitUserKycPayloadWithUmlauts is the SAME 13-field EIP-712
 // typed-data as the happy-path KYC payload, but with realistic German /
-// Swiss umlauts and accents in three fields: name (u-umlaut),
-// addressStreet (sharp-s), addressCity (u-umlaut). Every other field
-// stays ASCII to isolate the umlaut rejection to those specific fields.
-//
-// The umlauts are encoded as JSON \u-escapes (Go raw-string passes them
-// through verbatim; the JSON parser inside the BitBox SDK resolves the
-// escape to the same UTF-8 bytes a literal "u-umlaut" would produce). This
-// keeps the SOURCE FILE pure ASCII — important because the audit's
-// quirk-E1 regex flags any non-ASCII byte inside a string literal in a
-// file that touches EIP-712, and the testkit's own self-audit MUST
-// stay green (zero findings on `bitbox-audit . --fail-on-findings`).
+// Swiss umlauts and accents in three fields: name (ü), addressStreet
+// (ß), addressCity (ü). Every other field stays ASCII to isolate the
+// umlaut rejection to those specific fields.
 //
 // We expect the BitBox firmware to REJECT this with ErrInvalidInput101
 // (quirk E1). Consumers are responsible for transliterating via
@@ -381,6 +373,10 @@ func EthSignTypedDataKycMultiPage(dev *firmware.Device) Result {
 // (which would be a confusing partial-success path where the
 // consumer's transliteration becomes load-bearing for one firmware
 // version and dead code for the next).
+//
+// The literal non-ASCII bytes here are the actual test fixture — the
+// file-level audit-skip-file marker at the top of this file suppresses
+// the quirk-E1 self-audit hits these fixtures would otherwise produce.
 const realUnitUserKycPayloadWithUmlauts = `{
   "types": {
     "EIP712Domain": [
@@ -407,14 +403,14 @@ const realUnitUserKycPayloadWithUmlauts = `{
   "domain": {"name": "RealUnitUser", "version": "1"},
   "message": {
     "email": "test@dfx.swiss",
-    "name": "J\u00fcrg M\u00fcller",
+    "name": "Jürg Müller",
     "type": "natural-person",
     "phoneNumber": "+41123456789",
     "birthday": "1990-01-01",
     "nationality": "Switzerland",
-    "addressStreet": "Bahnhofstra\u00dfe 1",
+    "addressStreet": "Bahnhofstraße 1",
     "addressPostalCode": "8001",
-    "addressCity": "Z\u00fcrich",
+    "addressCity": "Zürich",
     "addressCountry": "Switzerland",
     "swissTaxResidence": true,
     "registrationDate": "2026-05-16T12:00:00Z",
