@@ -131,7 +131,13 @@ jobs:
           GO_TAG="go/${NEW_TAG}"
           git tag -a "$NEW_TAG" -m "Release $NEW_TAG"
           git tag -a "$GO_TAG" -m "$GO_TAG: submodule tag matching $NEW_TAG"
-          git push origin "$NEW_TAG" "$GO_TAG"
+          # --atomic so the server applies both ref updates as a single
+          # transaction. Without it a partial push could leave the repo
+          # with vX.Y.Z but no go/vX.Y.Z (or vice versa), and the next
+          # auto-tag run would fail the "tag exists" check while the
+          # consumer-facing `go install` would still 404 on the missing
+          # submodule tag.
+          git push --atomic origin "$NEW_TAG" "$GO_TAG"
 
           if [ -z "$PREV_TAG" ]; then
             gh release create "$NEW_TAG" --title "$NEW_TAG" --generate-notes
