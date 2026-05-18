@@ -14,6 +14,8 @@
 //	bitbox-simulator-check --output report.md       # write to file
 //	bitbox-simulator-check --cache ~/.bitbox-cache  # reuse downloaded binaries
 //	bitbox-simulator-check --fail-on-skip           # treat skip as failure
+//	bitbox-simulator-check --firmware bitbox02-multi-9.21.0  # specific build
+//	bitbox-simulator-check --firmware all           # matrix: every embedded build
 //
 // Exit codes:
 //
@@ -32,8 +34,6 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/BitBoxSwiss/bitbox02-api-go/api/firmware"
-	"github.com/flynn/noise"
 	"github.com/DFXswiss/bitbox-testkit/go/bitbox/simulator"
 )
 
@@ -42,6 +42,7 @@ func main() {
 	output := flag.String("output", "", "Write report to file instead of stdout.")
 	cacheDir := flag.String("cache", "", "Simulator-binary cache dir (default: $TMPDIR/bitbox-testkit-simcache).")
 	failOnSkip := flag.Bool("fail-on-skip", false, "Exit nonzero if scenarios were skipped (non-Linux host).")
+	firmware := flag.String("firmware", "", "Specific embedded firmware name (e.g. bitbox02-multi-9.21.0), or \"all\" for matrix. Default: newest.")
 	version := flag.Bool("version", false, "Print version and exit.")
 	flag.Parse()
 
@@ -55,19 +56,19 @@ func main() {
 		os.Exit(3)
 	}
 
-	report := buildReport(*cacheDir, *failOnSkip)
+	matrix := buildMatrixReport(*cacheDir, *failOnSkip, *firmware)
 
 	var rendered []byte
 	switch *format {
 	case "json":
-		b, err := json.MarshalIndent(report, "", "  ")
+		b, err := json.MarshalIndent(matrix, "", "  ")
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "marshal:", err)
 			os.Exit(2)
 		}
 		rendered = append(b, '\n')
 	default:
-		rendered = []byte(renderMarkdown(report))
+		rendered = []byte(renderMatrixMarkdown(matrix))
 	}
 
 	if *output != "" {
@@ -79,10 +80,24 @@ func main() {
 		_, _ = os.Stdout.Write(rendered)
 	}
 
-	os.Exit(report.ExitCode)
+	os.Exit(matrix.ExitCode)
 }
 
-// Report is the JSON-serialisable summary of a simulator run.
+// MatrixReport wraps one or more per-firmware reports. For the common
+// single-firmware run only the first element of Reports is populated;
+// the wrapper still gives consumers (CI parser, downstream tooling) a
+// stable shape that scales from N=1 to N=many without a schema fork.
+type MatrixReport struct {
+	Host     string   `json:"host"`
+	Started  time.Time `json:"started"`
+	Finished time.Time `json:"finished"`
+	Reports  []Report  `json:"reports"`
+	// ExitCode is the rollup: max(individual exit codes). A single
+	// failed scenario in any firmware tips the whole matrix red.
+	ExitCode int `json:"exit_code"`
+}
+
+// Report is the JSON-serialisable summary of a single simulator run.
 type Report struct {
 	Host       string              `json:"host"`
 	Skipped    bool                `json:"skipped"`
@@ -102,7 +117,38 @@ type Summary struct {
 	Failed int `json:"failed"`
 }
 
-func buildReport(cacheDirFlag string, failOnSkip bool) Report {
+// resolveFirmwareList expands the --firmware flag into the list of
+// binary names to run against. "" → just the newest. "all" → every
+// embedded binary. Anything else is treated as a single explicit name.
+func resolveFirmwareList(firmware string) []string {
+	if firmware == "all" {
+		bins := simulator.Simulators()
+		out := make([]string, len(bins))
+		for i, b := range bins {
+			out[i] = b.Name
+		}
+		return out
+	}
+	return []string{firmware}
+}
+
+func buildMatrixReport(cacheDirFlag string, failOnSkip bool, firmware string) MatrixReport {
+	started := time.Now()
+	host := fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH)
+	matrix := MatrixReport{Host: host, Started: started}
+
+	for _, name := range resolveFirmwareList(firmware) {
+		r := buildReport(cacheDirFlag, failOnSkip, name)
+		matrix.Reports = append(matrix.Reports, r)
+		if r.ExitCode > matrix.ExitCode {
+			matrix.ExitCode = r.ExitCode
+		}
+	}
+	matrix.Finished = time.Now()
+	return matrix
+}
+
+func buildReport(cacheDirFlag string, failOnSkip bool, firmwareName string) Report {
 	started := time.Now()
 	host := fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH)
 
@@ -129,51 +175,29 @@ func buildReport(cacheDirFlag string, failOnSkip bool) Report {
 		return failed(started, host, fmt.Errorf("mkdir cache: %w", err))
 	}
 
-	inst, err := simulator.Launch(cacheDir)
+	inst, err := simulator.LaunchVersion(cacheDir, firmwareName)
 	if err != nil {
-		return failed(started, host, fmt.Errorf("simulator.Launch: %w", err))
+		return failed(started, host, fmt.Errorf("simulator.LaunchVersion(%q): %w", firmwareName, err))
 	}
 	defer inst.Stop()
 
-	// The firmware client expects a Communication, a ConfigInterface
-	// (for persisting Noise keys across sessions — we keep them in-mem
-	// since the simulator is throw-away), and a Logger.
-	dev := firmware.NewDevice(
-		nil, // version: query from device via OP_INFO (firmware ≥ 4.3.0)
-		nil, // product: same
-		&memoryConfig{},
-		inst.Comm,
-		noopLogger{},
-	)
-	if err := dev.Init(); err != nil {
-		return failed(started, host, fmt.Errorf("firmware.Device.Init: %w", err))
+	dev, err := simulator.Connect(inst, simulator.ConnectOptions{})
+	if err != nil {
+		return failed(started, host, err)
 	}
 
-	// Noise XX handshake completed; now wait for the simulator firmware
-	// to mark the pairing as device-confirmed (it auto-confirms within
-	// a few hundred ms — on a physical BitBox this would require the
-	// user to compare + tap on the device screen). Once confirmed, we
-	// acknowledge from the app side via ChannelHashVerify(true), and
-	// the firmware unlocks the rest of the API surface.
-	deadline := time.Now().Add(5 * time.Second)
-	for {
-		_, verified := dev.ChannelHash()
-		if verified {
-			dev.ChannelHashVerify(true)
-			break
-		}
-		if time.Now().After(deadline) {
-			return failed(started, host, fmt.Errorf(
-				"firmware.Device: channel-hash never device-verified within 5s — the simulator should auto-confirm",
-			))
-		}
-		time.Sleep(100 * time.Millisecond)
+	// Resolve the actual firmware name we ended up running. For ""
+	// this is the newest embedded; for an explicit value it is just
+	// that value.
+	resolvedName := firmwareName
+	if resolvedName == "" {
+		resolvedName = simulator.Simulators()[0].Name
 	}
 
 	report := Report{
 		Host:     host,
 		Started:  started,
-		Firmware: simulator.Simulators()[0].Name,
+		Firmware: resolvedName,
 	}
 	for _, scenario := range simulator.BaselineScenarios() {
 		res := scenario(dev)
@@ -209,6 +233,34 @@ func failed(started time.Time, host string, err error) Report {
 	}
 }
 
+func renderMatrixMarkdown(m MatrixReport) string {
+	if len(m.Reports) == 0 {
+		return "# BitBox02 simulator check\n\n(no firmware reports — check flags)\n"
+	}
+	if len(m.Reports) == 1 {
+		return renderMarkdown(m.Reports[0])
+	}
+	// Matrix render: one section per firmware + a rolled-up header.
+	out := "# BitBox02 simulator check — firmware matrix\n\n"
+	out += fmt.Sprintf("Host: `%s` — Started: %s — Total duration: %s — Firmware tested: %d\n\n",
+		m.Host, m.Started.Format(time.RFC3339),
+		m.Finished.Sub(m.Started).Round(time.Millisecond), len(m.Reports))
+	out += "| Firmware | Passed | Failed | Total | Duration |\n"
+	out += "|---|---:|---:|---:|---:|\n"
+	for _, r := range m.Reports {
+		out += fmt.Sprintf("| `%s` | %d | %d | %d | %s |\n",
+			r.Firmware, r.Summary.Passed, r.Summary.Failed, r.Summary.Total,
+			r.Finished.Sub(r.Started).Round(time.Millisecond))
+	}
+	out += "\n"
+	for _, r := range m.Reports {
+		out += "## " + r.Firmware + "\n\n"
+		out += renderMarkdown(r)
+		out += "\n"
+	}
+	return out
+}
+
 func renderMarkdown(r Report) string {
 	out := "# BitBox02 simulator check\n\n"
 	out += fmt.Sprintf("Host: `%s` — Started: %s — Duration: %s\n\n",
@@ -236,38 +288,3 @@ func renderMarkdown(r Report) string {
 		r.Summary.Total, r.Summary.Passed, r.Summary.Failed)
 	return out
 }
-
-// memoryConfig is a minimal in-memory ConfigInterface. The simulator
-// regenerates the app keypair every run because the kept-state never
-// survives the process exit; that's fine for a CI run.
-type memoryConfig struct {
-	devicePubkeys [][]byte
-	appKey        *noise.DHKey
-}
-
-func (c *memoryConfig) ContainsDeviceStaticPubkey(pubkey []byte) bool {
-	for _, k := range c.devicePubkeys {
-		if string(k) == string(pubkey) {
-			return true
-		}
-	}
-	return false
-}
-func (c *memoryConfig) AddDeviceStaticPubkey(pubkey []byte) error {
-	c.devicePubkeys = append(c.devicePubkeys, append([]byte(nil), pubkey...))
-	return nil
-}
-func (c *memoryConfig) GetAppNoiseStaticKeypair() *noise.DHKey { return c.appKey }
-func (c *memoryConfig) SetAppNoiseStaticKeypair(key *noise.DHKey) error {
-	c.appKey = key
-	return nil
-}
-
-// noopLogger silences the firmware library's logging output. The CLI
-// captures pass/fail per scenario, so a debug stream from the library
-// would just be noise.
-type noopLogger struct{}
-
-func (noopLogger) Error(string, error) {}
-func (noopLogger) Info(string)         {}
-func (noopLogger) Debug(string)        {}

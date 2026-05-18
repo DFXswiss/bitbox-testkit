@@ -83,15 +83,47 @@ A Scenario returns a configured fake suitable for use in a single test. Two ques
 
 ## Releases
 
-Tags follow `v0.MAJOR.MINOR` semver. The TypeScript package and the Go module both pick up the same tag — there's no separate cadence. CHANGELOG.md must be updated as part of the release commit.
+Tags follow semver `vMAJOR.MINOR.PATCH`. The TypeScript package and the Go module both pick up the same tag — there's no separate cadence. CHANGELOG.md is updated as part of the change PR (not as a separate "release commit").
 
-The Go module lives at `/go/`, so Go's submodule-tagging convention requires **two** tags pointing at the same commit: `vX.Y.Z` for the repo / composite-action ref, and `go/vX.Y.Z` for `go install` to resolve the package. Without the `go/` prefixed tag, consumers hit:
+### Automatic flow (the normal path)
+
+Releases happen automatically off `main`. Once a PR merges into `develop`, the `Auto Release PR` workflow opens a `Release: develop -> main` PR. When that PR is merged, the `Auto Tag on Merge` workflow runs, looks at every commit between the previous tag and the new `main` HEAD, parses each subject as Conventional Commits, picks the highest bump, and creates **both** tags (`vX.Y.Z` and `go/vX.Y.Z`) plus the matching GitHub Release.
+
+The Go module lives at `/go/`, so Go's submodule-tagging convention requires the dual tag at the same commit. Without the `go/` prefixed tag, consumers hit:
 
 > `module github.com/DFXswiss/bitbox-testkit@vX.Y.Z found, but does not contain package …/go/cmd/bitbox-audit`
 
+#### Commit message → bump table
+
+The auto-tagger reads Conventional Commits 1.0. Use these subjects in your PR commits:
+
+| Subject prefix                           | Bump      | Example                                            |
+| ---------------------------------------- | --------- | -------------------------------------------------- |
+| `feat!:`, `fix!:`, `<type>!:`            | **MAJOR** | `feat!: drop legacy bitbox-api v0.11 support`      |
+| `BREAKING CHANGE:` in commit body        | **MAJOR** | (paired with any subject)                          |
+| `feat:`, `feat(scope):`                  | **MINOR** | `feat(simulator): add BTC scenarios`               |
+| `fix:`, `perf:`, `refactor:`, `revert:`  | **PATCH** | `fix(audit): suppress doc-comment false positive`  |
+| `chore:`, `ci:`, `docs:`, `test:`, `style:`, `build:` | **PATCH** | `ci: cache go modules`              |
+| (anything else)                          | **PATCH** + warning | the auto-tagger logs a warning to the CI step |
+
+The aggregator picks the **highest** bump across every commit in the range — one `feat!:` is enough to promote the whole release to a major bump, one `feat:` is enough for a minor.
+
+#### Local preview
+
+Before merging a release PR you can preview the version the auto-tagger will pick:
+
 ```bash
-# Bump version in /ts/package.json
-# Update CHANGELOG.md
+go -C go run ./cmd/release-version --base "$(git describe --tags --abbrev=0 --match='v*.*.*')" --report
+```
+
+The first stdout line is the next tag; the rest is a per-commit explanation of why each commit voted the way it did.
+
+### Manual release (escape hatch)
+
+If you ever need to ship out-of-band — e.g. an emergency security fix from a hotfix branch — push the tags by hand:
+
+```bash
+# Update CHANGELOG.md, /ts/package.json version
 git commit -am "Release vX.Y.Z"
 
 # Two tags, one commit. The 'go/' prefix is required by Go's
@@ -101,3 +133,5 @@ git tag -a go/vX.Y.Z -m "go/vX.Y.Z: submodule tag matching vX.Y.Z" vX.Y.Z^{}
 
 git push origin main --tags
 ```
+
+When the auto-tagger next runs, it will see the manual tags in `git tag -l` and pick the bump relative to them — no special-case handling needed.
