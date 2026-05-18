@@ -1,5 +1,18 @@
 name: Auto Tag on Merge
 
+# Conventional-Commits-aware release tagger. On every push to main:
+#   1. Find the latest vX.Y.Z tag.
+#   2. Run go/cmd/release-version against the latest-tag..HEAD range —
+#      it parses each commit subject + body as Conventional Commits and
+#      picks the highest bump (feat! / BREAKING CHANGE → major,
+#      feat: → minor, fix/perf/refactor/chore/ci/... → patch).
+#   3. Create the dual tags vX.Y.Z + go/vX.Y.Z (Go submodule resolver
+#      needs both at the same commit, see CONTRIBUTING.md Releases).
+#   4. Create the matching GitHub Release with auto-generated notes.
+#
+# Exit code 4 from the version tool means "no commits in the range"
+# and short-circuits the rest of the job — that prevents an empty
+# re-tag if a maintainer pushes the same commit twice.
 on:
   push:
     branches: [main]
@@ -22,48 +35,87 @@ jobs:
           fetch-depth: 0
           fetch-tags: true
 
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache: true
+          cache-dependency-path: go/go.sum
+
       - name: Get latest tag
         id: get-tag
         run: |
           LATEST_TAG=$(git tag -l --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1)
 
           if [ -z "$LATEST_TAG" ]; then
-            echo "No existing tags found, starting with v0.0.0"
-            LATEST_TAG="v0.0.0"
+            echo "::notice::No existing release tag found, this run will emit the initial release"
+            LATEST_TAG=""
+          else
+            echo "::notice::Latest tag: $LATEST_TAG"
           fi
 
-          echo "latest_tag=$LATEST_TAG" >> $GITHUB_OUTPUT
-          echo "::notice::Latest tag: $LATEST_TAG"
+          echo "latest_tag=$LATEST_TAG" >> "$GITHUB_OUTPUT"
 
-      - name: Calculate next version
+      - name: Decide next version (Conventional Commits)
         id: next-version
+        working-directory: go
+        env:
+          LATEST_TAG: ${{ steps.get-tag.outputs.latest_tag }}
         run: |
-          LATEST_TAG="${{ steps.get-tag.outputs.latest_tag }}"
+          set +e
+          NEW_TAG=$(go run ./cmd/release-version --base "$LATEST_TAG" --report 2>release-version.stderr)
+          rc=$?
+          set -e
 
-          VERSION="${LATEST_TAG#v}"
-          MAJOR=$(echo "$VERSION" | cut -d. -f1)
-          MINOR=$(echo "$VERSION" | cut -d. -f2)
-          PATCH=$(echo "$VERSION" | cut -d. -f3)
+          # Surface the per-commit report into the job log regardless
+          # of whether the tool succeeded — useful when a review needs
+          # to see which commits drove the bump.
+          if [ -s release-version.stderr ]; then
+            echo "::group::release-version warnings"
+            cat release-version.stderr
+            echo "::endgroup::"
+          fi
 
-          NEW_PATCH=$((PATCH + 1))
-          NEW_TAG="v${MAJOR}.${MINOR}.${NEW_PATCH}"
+          # The tool prints the next version on the first stdout line
+          # followed by a blank line and the report. Extract just the
+          # tag for downstream steps; emit the rest as a group.
+          FIRST_LINE=$(printf '%s' "$NEW_TAG" | head -n 1)
+          REST=$(printf '%s' "$NEW_TAG" | tail -n +2)
+          if [ -n "$REST" ]; then
+            echo "::group::release-version per-commit breakdown"
+            printf '%s\n' "$REST"
+            echo "::endgroup::"
+          fi
 
-          echo "new_tag=$NEW_TAG" >> $GITHUB_OUTPUT
-          echo "::notice::New tag: $NEW_TAG"
+          if [ "$rc" -eq 4 ]; then
+            echo "::notice::No commits since $LATEST_TAG — skipping release"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ "$rc" -ne 0 ]; then
+            echo "::error::release-version exited $rc"
+            exit "$rc"
+          fi
+
+          echo "::notice::Next tag: $FIRST_LINE (was: ${LATEST_TAG:-<none>})"
+          echo "new_tag=$FIRST_LINE" >> "$GITHUB_OUTPUT"
+          echo "skip=false" >> "$GITHUB_OUTPUT"
 
       - name: Check if tag exists
         id: check-tag
+        if: steps.next-version.outputs.skip != 'true'
         run: |
           NEW_TAG="${{ steps.next-version.outputs.new_tag }}"
           if git rev-parse "$NEW_TAG" >/dev/null 2>&1; then
-            echo "::error::Tag $NEW_TAG already exists!"
-            echo "exists=true" >> $GITHUB_OUTPUT
-          else
-            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "::error::Tag $NEW_TAG already exists — refusing to overwrite. \
+            Push an empty fixup commit to bump again, or delete the existing tag if it was misapplied."
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            exit 1
           fi
+          echo "exists=false" >> "$GITHUB_OUTPUT"
 
       - name: Create tag and release
-        if: steps.check-tag.outputs.exists == 'false'
+        if: steps.next-version.outputs.skip != 'true' && steps.check-tag.outputs.exists == 'false'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NEW_TAG: ${{ steps.next-version.outputs.new_tag }}
@@ -72,15 +124,22 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          # Go submodule convention: the module at /go/ needs a `go/vX.Y.Z`
-          # tag on the same commit, otherwise `go install` cannot resolve
-          # the package — see CONTRIBUTING.md "Releases".
+          # Dual-tag for the Go submodule pattern. Without `go/vX.Y.Z`,
+          # `go install github.com/DFXswiss/bitbox-testkit/go/cmd/...@vX.Y.Z`
+          # fails because Go's module resolver looks for the path-prefixed
+          # tag when the module lives in a subdirectory.
           GO_TAG="go/${NEW_TAG}"
           git tag -a "$NEW_TAG" -m "Release $NEW_TAG"
           git tag -a "$GO_TAG" -m "$GO_TAG: submodule tag matching $NEW_TAG"
-          git push origin "$NEW_TAG" "$GO_TAG"
+          # --atomic so the server applies both ref updates as a single
+          # transaction. Without it a partial push could leave the repo
+          # with vX.Y.Z but no go/vX.Y.Z (or vice versa), and the next
+          # auto-tag run would fail the "tag exists" check while the
+          # consumer-facing `go install` would still 404 on the missing
+          # submodule tag.
+          git push --atomic origin "$NEW_TAG" "$GO_TAG"
 
-          if [ "$PREV_TAG" = "v0.0.0" ]; then
+          if [ -z "$PREV_TAG" ]; then
             gh release create "$NEW_TAG" --title "$NEW_TAG" --generate-notes
           else
             gh release create "$NEW_TAG" --title "$NEW_TAG" --generate-notes --notes-start-tag "$PREV_TAG"
